@@ -1,4 +1,4 @@
-module github.com/teru01/gprogen
+module github.com/teru01/gstbgen
 
 go 1.18
 

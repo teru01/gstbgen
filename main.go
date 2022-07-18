@@ -61,7 +61,7 @@ func Start(c *cli.Context) error {
 				close(quitChan)
 				break
 			}
-			log.Printf("pressed: %v, Press q to quit.\n", string(r))
+			log.Printf("Press q to quit (pressed %v).\n", string(r))
 		}
 	}(t)
 
