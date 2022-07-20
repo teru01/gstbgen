@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/elazarl/goproxy"
 	"github.com/mattn/go-tty"
 	"github.com/urfave/cli/v2"
 )
@@ -39,40 +41,60 @@ func main() {
 }
 
 func Start(c *cli.Context) error {
-	svc := http.Server{
-		Addr: c.String("host") + ":" + c.String("port"),
-	}
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		log.Printf("%s %s %s\n", r.Method, r.URL.String(), r.Proto)
+		return r, nil
+	})
 
+	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		log.Printf("%s %s %s\n", r.Request.Method, r.Request.URL.String(), r.Request.Proto)
+		return r
+	})
+
+	svc := http.Server{
+		Addr:    c.String("host") + ":" + c.String("port"),
+		Handler: proxy,
+	}
+	quit := make(chan struct{})
+	go func(svc http.Server, quit chan struct{}) {
+		log.Println("listening on", svc.Addr)
+		if err := svc.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+		close(quit)
+	}(svc, quit)
+
+	pressQ := make(chan struct{})
+	if err := OpenTTY(pressQ); err != nil {
+		return fmt.Errorf("OpenTTY: %w", err)
+	}
+	<-pressQ
+	if err := svc.Shutdown(context.Background()); err != nil {
+		log.Println(err)
+	}
+	<-quit
+	return nil
+}
+
+func OpenTTY(pressQ chan struct{}) error {
 	t, err := tty.Open()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to open tty: %w", err)
 	}
-	defer t.Close()
 	go func(t *tty.TTY) {
+		defer t.Close()
 		for {
 			r, err := t.ReadRune()
 			if err != nil {
 				log.Println(err)
 			}
 			if r == 'q' {
-				if err := svc.Shutdown(context.Background()); err != nil {
-					log.Println(err)
-				}
-				close(quitChan)
+				close(pressQ)
 				break
 			}
 			log.Printf("Press q to quit (pressed %v).\n", string(r))
 		}
 	}(t)
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, world!"))
-	})
-
-	log.Println("listening on", svc.Addr)
-	if err := svc.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatal(err)
-	}
-	<-quitChan
 	return nil
 }
