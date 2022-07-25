@@ -7,11 +7,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/elazarl/goproxy"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
+
+var flows = &Flowsx{
+	Flows: make(map[string]Flow),
+	mutex: sync.Mutex{},
+}
 
 func main() {
 	app := &cli.App{
@@ -39,13 +45,14 @@ func main() {
 	}
 }
 
-var flow = make(map[string]string)
-
 func Start(c *cli.Context) error {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		flowID := uuid.NewString()
-		flow[flowID] = r.URL.String()
+		flowID := uuid.New().String()
+		flows.Add(Flow{
+			ID:      flowID,
+			Request: *r,
+		})
 		ctx.UserData = flowID
 		_, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -57,10 +64,7 @@ func Start(c *cli.Context) error {
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		flowID := ctx.UserData.(string)
-		fmt.Println(flowID)
-		fmt.Println(flow[flowID])
-		// flow[flowID] = flow[flowID] + " -> " + r.Request.URL.String()
-		log.Printf("%s %s\n", r.Request.Method, r.Request.URL.String())
+		flows.AddResponse(flowID, r)
 		return r
 	})
 
@@ -84,8 +88,12 @@ func Start(c *cli.Context) error {
 	<-pressQ
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
-		for id, v := range flow {
-			log.Println(id, v)
+	}
+	for _, flow := range flows.Flows {
+		if flow.Response != nil {
+			log.Printf("%s -> %s\n", flow.Request.URL.String(), flow.Response.Status)
+		} else {
+			log.Printf("%s -> ERR\n", flow.Request.URL.String())
 		}
 	}
 	<-quit
