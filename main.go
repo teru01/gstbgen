@@ -3,16 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/elazarl/goproxy"
-	"github.com/mattn/go-tty"
+	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
-
-var quitChan = make(chan struct{})
 
 func main() {
 	app := &cli.App{
@@ -40,15 +39,28 @@ func main() {
 	}
 }
 
+var flow = make(map[string]string)
+
 func Start(c *cli.Context) error {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		log.Printf("%s %s %s\n", r.Method, r.URL.String(), r.Proto)
+		flowID := uuid.NewString()
+		flow[flowID] = r.URL.String()
+		ctx.UserData = flowID
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("%s %s\n", r.Method, r.URL.String())
 		return r, nil
 	})
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		log.Printf("%s %s %s\n", r.Request.Method, r.Request.URL.String(), r.Request.Proto)
+		flowID := ctx.UserData.(string)
+		fmt.Println(flowID)
+		fmt.Println(flow[flowID])
+		// flow[flowID] = flow[flowID] + " -> " + r.Request.URL.String()
+		log.Printf("%s %s\n", r.Request.Method, r.Request.URL.String())
 		return r
 	})
 
@@ -72,29 +84,10 @@ func Start(c *cli.Context) error {
 	<-pressQ
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
+		for id, v := range flow {
+			log.Println(id, v)
+		}
 	}
 	<-quit
-	return nil
-}
-
-func OpenTTY(pressQ chan struct{}) error {
-	t, err := tty.Open()
-	if err != nil {
-		return fmt.Errorf("failed to open tty: %w", err)
-	}
-	go func(t *tty.TTY) {
-		defer t.Close()
-		for {
-			r, err := t.ReadRune()
-			if err != nil {
-				log.Println(err)
-			}
-			if r == 'q' {
-				close(pressQ)
-				break
-			}
-			log.Printf("Press q to quit (pressed %v).\n", string(r))
-		}
-	}(t)
 	return nil
 }
