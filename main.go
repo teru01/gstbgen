@@ -37,7 +37,7 @@ func main() {
 		},
 		Name:   "gprogen",
 		Usage:  "Go proxy and stub generator for load test",
-		Action: Start,
+		Action: start,
 	}
 	err := app.Run(os.Args)
 	if err != nil {
@@ -45,7 +45,7 @@ func main() {
 	}
 }
 
-func Start(c *cli.Context) error {
+func start(c *cli.Context) error {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		flowID := uuid.New().String()
@@ -89,13 +89,11 @@ func Start(c *cli.Context) error {
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
 	}
-	for _, flow := range flows.Flows {
-		if flow.Response != nil {
-			log.Printf("%s -> %s\n", flow.Request.URL.String(), flow.Response.Status)
-		} else {
-			log.Printf("%s -> ERR\n", flow.Request.URL.String())
-		}
+	g, err := Generate(flows.Flows)
+	if err != nil {
+		return fmt.Errorf("Generate: %w", err)
 	}
+	fmt.Println(g)
 	<-quit
 	return nil
 }

@@ -31,3 +31,7 @@ func (f *Flowsx) AddResponse(flowID string, response *http.Response) {
 		Response: response,
 	}
 }
+
+// func (f *Flowsx) Get(flowID string) Flow {
+
+// }
