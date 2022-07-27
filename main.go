@@ -73,13 +73,13 @@ func Start(c *cli.Context) error {
 		Handler: proxy,
 	}
 	quit := make(chan struct{})
-	go func(svc http.Server, quit chan struct{}) {
+	go func(svc *http.Server, quit chan struct{}) {
 		log.Println("listening on", svc.Addr)
 		if err := svc.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
-		close(quit)
-	}(svc, quit)
+		quit <- struct{}{}
+	}(&svc, quit)
 
 	pressQ := make(chan struct{})
 	if err := OpenTTY(pressQ); err != nil {
