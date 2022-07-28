@@ -102,11 +102,11 @@ func generateMain(oa []outerAPI) []jen.Code {
 				jen.Id("rw").Dot("Header").Dot("Set").Call(jen.Lit("Content-Type"), jen.Lit("application/json")),
 				// TODO
 			)),
-			jen.Id("server").Op(":=").Qual("net/http", "Server").Block(
-				jen.Id("Addr").Op(":").Lit(":8080"),
-				jen.Id("Handler").Op(":").Id("mux"),
-			),
-			jen.Go().Id("server").Qual("net/http", "ListenAndServe").Call(),
+			jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
+				jen.Lit("Addr"):    jen.Lit(":8080"),
+				jen.Lit("Handler"): jen.Id("mux"),
+			}),
+			jen.Go().Id("server").Dot("ListenAndServe").Call(),
 			jen.Return(jen.Id("server")),
 		).Call())
 	}
