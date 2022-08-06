@@ -104,7 +104,7 @@ func generateMain(oa []ExternalAPI) []jen.Code {
 				// TODO
 			)),
 			jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-				jen.Lit("Addr"):    jen.Lit(":8080"),
+				jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
 				jen.Lit("Handler"): jen.Id("mux"),
 			}),
 			jen.Go().Id("server").Dot("ListenAndServe").Call(),
@@ -112,6 +112,11 @@ func generateMain(oa []ExternalAPI) []jen.Code {
 		).Call())
 	}
 	return codes
+}
+
+func nextPort(i int) int {
+	// TODO: フラグでポート範囲選択
+	return 8080 + i
 }
 
 func sortExternalAPI(o ExternalAPIMap) []ExternalAPI {
