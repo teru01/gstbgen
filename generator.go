@@ -4,45 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/dave/jennifer/jen"
 )
 
-type HostKey struct {
-	Domain string
-	Port   int
-}
-
-type ReqValue struct {
-	Method    string
-	QueryJSON string
-}
-
-type ExternalAPIMapKey struct {
-	HostKey  HostKey
-	Path     string
-	ReqValue ReqValue
-}
-
-type ExternalAPIResponse struct {
-	Header     http.Header
-	StatusCode int
-	Body       []byte
-}
-
-type ExternalAPI struct {
-	key       ExternalAPIMapKey
-	responses []ExternalAPIResponse
-}
-
-type ExternalAPIMap map[ExternalAPIMapKey][]ExternalAPIResponse
-
-func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
-	externalAPI := ExternalAPIMap{}
+func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 	for _, flow := range flows {
 		var port int
 		hostport := strings.Split(flow.Request.Host, ":")
@@ -58,20 +26,22 @@ func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
 
 		query, err := json.Marshal(flow.Request.URL.Query())
 		if err != nil {
-			return externalAPI, err
+			return nil, err
 		}
+		queryString := string(query)
+		// bodyが空orJSONでない場合があるので失敗しても無視する
+		rb, _ := json.Marshal(flow.Request.Body)
+		reqBodyString := string(rb)
 
-		o := ExternalAPIMapKey{
-			HostKey: HostKey{
-				Domain: flow.Request.Host,
-				Port:   port,
-			},
-			Path: flow.Request.URL.Path,
-			ReqValue: ReqValue{
-				Method:    flow.Request.Method,
-				QueryJSON: string(query),
-			},
+		var body []byte
+		if flow.Response.Body != nil {
+			body, err = io.ReadAll(flow.Response.Body)
+			if err != nil {
+				return nil, err
+			}
+			flow.Response.Body.Close()
 		}
+		respBodyString := string(body)
 
 		delete(flow.Response.Header, "Date")
 		delete(flow.Response.Header, "Content-Type")
@@ -80,59 +50,131 @@ func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
 		delete(flow.Response.Header, "Connection")
 		delete(flow.Response.Header, "Keep-Alive")
 
-		body, err := io.ReadAll(flow.Response.Body)
-		if err != nil {
-			return externalAPI, err
+		respBody := RespBody{
+			Value: respBodyString,
 		}
-		flow.Response.Body.Close()
-		externalAPI[o] = append(externalAPI[o], ExternalAPIResponse{
-			Header:     flow.Response.Header,
-			StatusCode: flow.Response.StatusCode,
-			Body:       body,
-		})
+		respBodies[respBodyString] = respBody
+
+		reqBody := ReqBody{
+			Value: reqBodyString,
+			Children: func() []SyntaxNode {
+				if r, found := reqBodies[reqBodyString]; found {
+					return mergeChild(&r, &respBody)
+				}
+				return []SyntaxNode{&respBody}
+			}(),
+		}
+		reqBodies[reqBodyString] = reqBody
+
+		queryParameter := QueryParameter{
+			Value: queryString,
+			Children: func() []SyntaxNode {
+				if q, found := queryParameters[queryString]; found {
+					return mergeChild(&q, &reqBody)
+				}
+				return []SyntaxNode{&reqBody}
+			}(),
+		}
+		queryParameters[queryString] = queryParameter
+
+		method := Method{
+			Value: flow.Request.Method,
+			Children: func() []SyntaxNode {
+				if m, found := methods[flow.Request.Method]; found {
+					return mergeChild(&m, &queryParameter)
+				}
+				return []SyntaxNode{&queryParameter}
+			}(),
+		}
+		methods[method.Value] = method
+
+		path := Path{
+			Value: flow.Request.URL.Path,
+			Children: func() []SyntaxNode {
+				if p, found := paths[flow.Request.URL.Path]; found {
+					return mergeChild(&p, &method)
+				}
+				return []SyntaxNode{&method}
+			}(),
+		}
+		paths[path.Value] = path
+
+		hostString := fmt.Sprintf("%s:%d", flow.Request.Host, port)
+		host := Host{
+			Value: hostString,
+			Children: func() []SyntaxNode {
+				if h, found := hosts[hostString]; found {
+					return mergeChild(&h, &path)
+				}
+				return []SyntaxNode{&path}
+			}(),
+		}
+		hosts[hostString] = host
 	}
-	return externalAPI, nil
+	hostsList := make([]SyntaxNode, 0, len(hosts))
+	for _, host := range hosts {
+		hostsList = append(hostsList, &host)
+	}
+	root.Children = hostsList
+	return root, nil
 }
 
-func generate(externalAPI ExternalAPIMap) *jen.Statement {
-	sorted := sortExternalAPI(externalAPI)
+func generate(root SyntaxNode) *jen.Statement {
 	return jen.Func().Id("main").Params().Block(
-		append(generateServer(sorted), generateSignalHandler()...)...,
+		append(generateServerFuncs(root, true, true), generateSignalHandler()...)...,
 	)
 }
 
-func generateServer(apis []ExternalAPI) []jen.Code {
-	var codes, codesInSameMux, codesInSameHandler []jen.Code
-	var prevApi ExternalAPI
-	for i, api := range apis {
-		if prevApi.key.HostKey.Domain == api.key.HostKey.Domain && prevApi.key.HostKey.Port == api.key.HostKey.Port {
-			if prevApi.key.Path == api.key.Path {
-				if prevApi.key.ReqValue.Method == api.key.ReqValue.Method {
-					if prevApi.key.ReqValue.QueryJSON == api.key.ReqValue.QueryJSON {
-					}
-				}
-				codesInSameHandler = append(codesInSameHandler, gen())
-			}
-			// handlerfunc生成
-			hf := jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
-				codesInSameHandler...,
-			))
-			codesInSameMux = append(codesInSameMux, hf)
-		} else {
-			codes = append(codes, jen.Func().Params().Block(
-				jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
-				jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-					jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
-					jen.Lit("Handler"): jen.Id("mux"),
-				}),
-				jen.Go().Id("server").Dot("ListenAndServe").Call(),
-			).Call())
-		}
-	LAST:
-		prevApi = api
+func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
+	var codes []jen.Code
+	children := node.children()
+	if len(children) == 0 {
+		return node.render(nil, isFirst, isLast)
 	}
-	return codes
+	for i, child := range children {
+		var isFirst, isLast bool
+		if i == 0 {
+			isFirst = true
+		}
+		if i == len(children)-1 {
+			isLast = true
+		}
+		codes = append(codes, generateServerFuncs(child, isFirst, isLast)...)
+	}
+	return node.render(&codes, isFirst, isLast)
 }
+
+// func generateServer(apis []ExternalAPI) []jen.Code {
+// 	var codes, codesInSameMux, codesInSameHandler []jen.Code
+// 	var prevApi ExternalAPI
+// 	for i, api := range apis {
+// 		if prevApi.key.HostKey.Domain == api.key.HostKey.Domain && prevApi.key.HostKey.Port == api.key.HostKey.Port {
+// 			if prevApi.key.Path == api.key.Path {
+// 				if prevApi.key.ReqValue.Method == api.key.ReqValue.Method {
+// 					if prevApi.key.ReqValue.QueryJSON == api.key.ReqValue.QueryJSON {
+// 					}
+// 				}
+// 				// codesInSameHandler = append(codesInSameHandler, api.render(&codesInSameHandler)...)
+// 			}
+// 			// handlerfunc生成
+// 			hf := jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
+// 				codesInSameHandler...,
+// 			))
+// 			codesInSameMux = append(codesInSameMux, hf)
+// 		} else {
+// 			codes = append(codes, jen.Func().Params().Block(
+// 				jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
+// 				jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
+// 					jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
+// 					jen.Lit("Handler"): jen.Id("mux"),
+// 				}),
+// 				jen.Go().Id("server").Dot("ListenAndServe").Call(),
+// 			).Call())
+// 		}
+// 		prevApi = api
+// 	}
+// 	return codes
+// }
 
 func generateSignalHandler() []jen.Code {
 	return []jen.Code{
@@ -145,27 +187,4 @@ func generateSignalHandler() []jen.Code {
 func nextPort(i int) int {
 	// TODO: フラグでポート範囲選択
 	return 8080 + i
-}
-
-func sortExternalAPI(o ExternalAPIMap) []ExternalAPI {
-	l := make([]ExternalAPI, 0, len(o))
-	for key, v := range o {
-		l = append(l, ExternalAPI{key, v})
-	}
-	sort.Slice(l, func(i, j int) bool {
-		if l[i].key.HostKey.Domain == l[j].key.HostKey.Domain {
-			if l[i].key.HostKey.Port == l[j].key.HostKey.Port {
-				if l[i].key.Path == l[j].key.Path {
-					if l[i].key.ReqValue.Method == l[j].key.ReqValue.Method {
-						return l[i].key.ReqValue.QueryJSON < l[j].key.ReqValue.QueryJSON
-					}
-					return l[i].key.ReqValue.Method < l[j].key.ReqValue.Method
-				}
-				return l[i].key.Path < l[j].key.Path
-			}
-			return l[i].key.HostKey.Port < l[j].key.HostKey.Port
-		}
-		return l[i].key.HostKey.Domain < l[j].key.HostKey.Domain
-	})
-	return l
 }

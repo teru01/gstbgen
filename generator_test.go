@@ -42,7 +42,7 @@ func TestGenerateMain(t *testing.T) {
 			Body: io.NopCloser(bytes.NewReader([]byte(`{"foo": "bar"}`))),
 		},
 	}
-	o, err := createExternalAPIMap(flows)
+	o, err := createExternalAPITree(flows)
 	assert.NoError(t, err)
 	stmt := generate(o)
 	assert.Equal(t, fmt.Sprintf("%#v", stmt),

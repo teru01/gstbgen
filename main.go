@@ -89,7 +89,7 @@ func start(c *cli.Context) error {
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
 	}
-	externalAPI, err := createExternalAPIMap(flows.Flows)
+	externalAPI, err := createExternalAPITree(flows.Flows)
 	if err != nil {
 		return fmt.Errorf("Generate: %w", err)
 	}
