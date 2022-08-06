@@ -16,13 +16,13 @@ type Flowsx struct {
 	mutex sync.Mutex
 }
 
-func (f *Flowsx) Add(flow Flow) {
+func (f *Flowsx) add(flow Flow) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.Flows[flow.ID] = flow
 }
 
-func (f *Flowsx) AddResponse(flowID string, response *http.Response) {
+func (f *Flowsx) addResponse(flowID string, response *http.Response) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.Flows[flowID] = Flow{

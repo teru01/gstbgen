@@ -33,10 +33,15 @@ type ExternalAPIResponse struct {
 	Body       []byte
 }
 
-type ExternalAPI map[ExternalAPIMapKey][]ExternalAPIResponse
+type ExternalAPI struct {
+	key       ExternalAPIMapKey
+	responses []ExternalAPIResponse
+}
 
-func CreateExternalAPIMap(flows map[string]Flow) (ExternalAPI, error) {
-	externalAPI := ExternalAPI{}
+type ExternalAPIMap map[ExternalAPIMapKey][]ExternalAPIResponse
+
+func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
+	externalAPI := ExternalAPIMap{}
 	for _, flow := range flows {
 		var port int
 		hostport := strings.Split(flow.Request.Host, ":")
@@ -81,24 +86,19 @@ func CreateExternalAPIMap(flows map[string]Flow) (ExternalAPI, error) {
 	return externalAPI, nil
 }
 
-type externalAPI struct {
-	o         ExternalAPIMapKey
-	responses []ExternalAPIResponse
-}
-
-func generate(externalAPI ExternalAPI) *jen.Statement {
-	sorted := sortedExternalAPI(externalAPI)
+func generate(externalAPI ExternalAPIMap) *jen.Statement {
+	sorted := sortExternalAPI(externalAPI)
 	return jen.Func().Id("main").Params().Block(
 		generateMain(sorted)...,
 	)
 }
 
-func generateMain(oa []externalAPI) []jen.Code {
+func generateMain(oa []ExternalAPI) []jen.Code {
 	var codes []jen.Code
 	for i, api := range oa {
 		codes = append(codes, jen.Id(fmt.Sprintf("srv%d", i)).Op(":=").Func().Params().Qual("net/http", "Server").Block(
 			jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
-			jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.o.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
+			jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
 				jen.Id("rw").Dot("Header").Dot("Set").Call(jen.Lit("Content-Type"), jen.Lit("application/json")),
 				// TODO
 			)),
@@ -113,25 +113,25 @@ func generateMain(oa []externalAPI) []jen.Code {
 	return codes
 }
 
-func sortedExternalAPI(o ExternalAPI) []externalAPI {
-	l := make([]externalAPI, 0, len(o))
+func sortExternalAPI(o ExternalAPIMap) []ExternalAPI {
+	l := make([]ExternalAPI, 0, len(o))
 	for key, v := range o {
-		l = append(l, externalAPI{key, v})
+		l = append(l, ExternalAPI{key, v})
 	}
 	sort.Slice(l, func(i, j int) bool {
-		if l[i].o.HostKey.Domain == l[j].o.HostKey.Domain {
-			if l[i].o.HostKey.Port == l[j].o.HostKey.Port {
-				if l[i].o.Path == l[j].o.Path {
-					if l[i].o.ReqValue.Method == l[j].o.ReqValue.Method {
-						return l[i].o.ReqValue.QueryJSON < l[j].o.ReqValue.QueryJSON
+		if l[i].key.HostKey.Domain == l[j].key.HostKey.Domain {
+			if l[i].key.HostKey.Port == l[j].key.HostKey.Port {
+				if l[i].key.Path == l[j].key.Path {
+					if l[i].key.ReqValue.Method == l[j].key.ReqValue.Method {
+						return l[i].key.ReqValue.QueryJSON < l[j].key.ReqValue.QueryJSON
 					}
-					return l[i].o.ReqValue.Method < l[j].o.ReqValue.Method
+					return l[i].key.ReqValue.Method < l[j].key.ReqValue.Method
 				}
-				return l[i].o.Path < l[j].o.Path
+				return l[i].key.Path < l[j].key.Path
 			}
-			return l[i].o.HostKey.Port < l[j].o.HostKey.Port
+			return l[i].key.HostKey.Port < l[j].key.HostKey.Port
 		}
-		return l[i].o.HostKey.Domain < l[j].o.HostKey.Domain
+		return l[i].key.HostKey.Domain < l[j].key.HostKey.Domain
 	})
 	return l
 }

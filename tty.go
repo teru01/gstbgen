@@ -7,7 +7,7 @@ import (
 	"github.com/mattn/go-tty"
 )
 
-func OpenTTY(pressQ chan struct{}) error {
+func openTTY(pressQ chan struct{}) error {
 	t, err := tty.Open()
 	if err != nil {
 		// TODO: テスト時にttyが割り当たらない

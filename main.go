@@ -49,7 +49,7 @@ func start(c *cli.Context) error {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		flowID := uuid.New().String()
-		flows.Add(Flow{
+		flows.add(Flow{
 			ID:      flowID,
 			Request: *r,
 		})
@@ -64,7 +64,7 @@ func start(c *cli.Context) error {
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		flowID := ctx.UserData.(string)
-		flows.AddResponse(flowID, r)
+		flows.addResponse(flowID, r)
 		return r
 	})
 
@@ -82,14 +82,14 @@ func start(c *cli.Context) error {
 	}(&svc, quit)
 
 	pressQ := make(chan struct{})
-	if err := OpenTTY(pressQ); err != nil {
+	if err := openTTY(pressQ); err != nil {
 		return fmt.Errorf("OpenTTY: %w", err)
 	}
 	<-pressQ
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
 	}
-	externalAPI, err := CreateExternalAPIMap(flows.Flows)
+	externalAPI, err := createExternalAPIMap(flows.Flows)
 	if err != nil {
 		return fmt.Errorf("Generate: %w", err)
 	}
