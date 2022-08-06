@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -79,8 +80,15 @@ func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
 		delete(flow.Response.Header, "Connection")
 		delete(flow.Response.Header, "Keep-Alive")
 
+		body, err := io.ReadAll(flow.Response.Body)
+		if err != nil {
+			return externalAPI, err
+		}
+		flow.Response.Body.Close()
 		externalAPI[o] = append(externalAPI[o], ExternalAPIResponse{
-			Header: flow.Response.Header,
+			Header:     flow.Response.Header,
+			StatusCode: flow.Response.StatusCode,
+			Body:       body,
 		})
 	}
 	return externalAPI, nil
@@ -93,21 +101,35 @@ func generate(externalAPI ExternalAPIMap) *jen.Statement {
 	)
 }
 
-func generateServer(oa []ExternalAPI) []jen.Code {
-	var codes []jen.Code
-	for i, api := range oa {
-		codes = append(codes, jen.Func().Params().Block(
-			jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
-			jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
-				jen.Id("rw").Dot("WriteHeader").Call(jen.Qual("net/http", "StatusOK")),
-				// TODO
-			)),
-			jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-				jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
-				jen.Lit("Handler"): jen.Id("mux"),
-			}),
-			jen.Go().Id("server").Dot("ListenAndServe").Call(),
-		).Call())
+func generateServer(apis []ExternalAPI) []jen.Code {
+	var codes, codesInSameMux, codesInSameHandler []jen.Code
+	var prevApi ExternalAPI
+	for i, api := range apis {
+		if prevApi.key.HostKey.Domain == api.key.HostKey.Domain && prevApi.key.HostKey.Port == api.key.HostKey.Port {
+			if prevApi.key.Path == api.key.Path {
+				if prevApi.key.ReqValue.Method == api.key.ReqValue.Method {
+					if prevApi.key.ReqValue.QueryJSON == api.key.ReqValue.QueryJSON {
+					}
+				}
+				codesInSameHandler = append(codesInSameHandler, gen())
+			}
+			// handlerfunc生成
+			hf := jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
+				codesInSameHandler...,
+			))
+			codesInSameMux = append(codesInSameMux, hf)
+		} else {
+			codes = append(codes, jen.Func().Params().Block(
+				jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
+				jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
+					jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
+					jen.Lit("Handler"): jen.Id("mux"),
+				}),
+				jen.Go().Id("server").Dot("ListenAndServe").Call(),
+			).Call())
+		}
+	LAST:
+		prevApi = api
 	}
 	return codes
 }
