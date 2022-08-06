@@ -50,7 +50,6 @@ func TestGenerateMain(t *testing.T) {
 	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
-			rw.Header.Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusOK)
 		})
 		server := http.Server{
@@ -62,7 +61,6 @@ func TestGenerateMain(t *testing.T) {
 	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/hoge", func(rw http.ResponseWriter, r *http.Request) {
-			rw.Header.Set("Content-Type", "application/json")
 			rw.WriteHeader(http.StatusOK)
 		})
 		server := http.Server{

@@ -99,7 +99,6 @@ func generateServer(oa []ExternalAPI) []jen.Code {
 		codes = append(codes, jen.Func().Params().Block(
 			jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
 			jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
-				jen.Id("rw").Dot("Header").Dot("Set").Call(jen.Lit("Content-Type"), jen.Lit("application/json")),
 				jen.Id("rw").Dot("WriteHeader").Call(jen.Qual("net/http", "StatusOK")),
 				// TODO
 			)),
