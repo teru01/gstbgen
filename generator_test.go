@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -43,5 +44,32 @@ func TestGenerateMain(t *testing.T) {
 	}
 	o, err := createExternalAPIMap(flows)
 	assert.NoError(t, err)
-	generate(o)
+	stmt := generate(o)
+	assert.Equal(t, fmt.Sprintf("%#v", stmt),
+		`func main() {
+	srv0 := func() http.Server {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header.Set("Content-Type", "application/json")
+		})
+		server := http.Server{
+			"Addr":    ":8080",
+			"Handler": mux,
+		}
+		go server.ListenAndServe()
+		return server
+	}()
+	srv1 := func() http.Server {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/hoge", func(rw http.ResponseWriter, r *http.Request) {
+			rw.Header.Set("Content-Type", "application/json")
+		})
+		server := http.Server{
+			"Addr":    ":8080",
+			"Handler": mux,
+		}
+		go server.ListenAndServe()
+		return server
+	}()
+}`)
 }
