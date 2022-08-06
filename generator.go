@@ -89,14 +89,14 @@ func createExternalAPIMap(flows map[string]Flow) (ExternalAPIMap, error) {
 func generate(externalAPI ExternalAPIMap) *jen.Statement {
 	sorted := sortExternalAPI(externalAPI)
 	return jen.Func().Id("main").Params().Block(
-		generateMain(sorted)...,
+		append(generateServer(sorted), generateSignalHandler()...)...,
 	)
 }
 
-func generateMain(oa []ExternalAPI) []jen.Code {
+func generateServer(oa []ExternalAPI) []jen.Code {
 	var codes []jen.Code
 	for i, api := range oa {
-		codes = append(codes, jen.Id(fmt.Sprintf("srv%d", i)).Op(":=").Func().Params().Qual("net/http", "Server").Block(
+		codes = append(codes, jen.Func().Params().Block(
 			jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
 			jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
 				jen.Id("rw").Dot("Header").Dot("Set").Call(jen.Lit("Content-Type"), jen.Lit("application/json")),
@@ -108,10 +108,17 @@ func generateMain(oa []ExternalAPI) []jen.Code {
 				jen.Lit("Handler"): jen.Id("mux"),
 			}),
 			jen.Go().Id("server").Dot("ListenAndServe").Call(),
-			jen.Return(jen.Id("server")),
 		).Call())
 	}
 	return codes
+}
+
+func generateSignalHandler() []jen.Code {
+	return []jen.Code{
+		jen.Id("sig").Op(":=").Make(jen.Chan().Qual("os", "Signal")),
+		jen.Qual("os/signal", "Notify").Call(jen.Id("sig"), jen.Qual("syscall", "SIGINT"), jen.Qual("syscall", "SIGTERM"), jen.Qual("syscall", "SIGQUIT")),
+		jen.Id("<-sig"),
+	}
 }
 
 func nextPort(i int) int {

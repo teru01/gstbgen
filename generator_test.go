@@ -47,7 +47,7 @@ func TestGenerateMain(t *testing.T) {
 	stmt := generate(o)
 	assert.Equal(t, fmt.Sprintf("%#v", stmt),
 		`func main() {
-	srv0 := func() http.Server {
+	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header.Set("Content-Type", "application/json")
@@ -58,9 +58,8 @@ func TestGenerateMain(t *testing.T) {
 			"Handler": mux,
 		}
 		go server.ListenAndServe()
-		return server
 	}()
-	srv1 := func() http.Server {
+	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/hoge", func(rw http.ResponseWriter, r *http.Request) {
 			rw.Header.Set("Content-Type", "application/json")
@@ -71,7 +70,9 @@ func TestGenerateMain(t *testing.T) {
 			"Handler": mux,
 		}
 		go server.ListenAndServe()
-		return server
 	}()
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-sig
 }`)
 }
