@@ -21,22 +21,22 @@ type ReqValue struct {
 	QueryJSON string
 }
 
-type OuterAPIMapKey struct {
+type ExternalAPIMapKey struct {
 	HostKey  HostKey
 	Path     string
 	ReqValue ReqValue
 }
 
-type OuterAPIResponse struct {
+type ExternalAPIResponse struct {
 	Header     http.Header
 	StatusCode int
 	Body       []byte
 }
 
-type OuterAPI map[OuterAPIMapKey][]OuterAPIResponse
+type ExternalAPI map[ExternalAPIMapKey][]ExternalAPIResponse
 
-func CreateOuterAPIMap(flows map[string]Flow) (OuterAPI, error) {
-	outerAPI := OuterAPI{}
+func CreateExternalAPIMap(flows map[string]Flow) (ExternalAPI, error) {
+	externalAPI := ExternalAPI{}
 	for _, flow := range flows {
 		var port int
 		hostport := strings.Split(flow.Request.Host, ":")
@@ -52,10 +52,10 @@ func CreateOuterAPIMap(flows map[string]Flow) (OuterAPI, error) {
 
 		query, err := json.Marshal(flow.Request.URL.Query())
 		if err != nil {
-			return outerAPI, err
+			return externalAPI, err
 		}
 
-		o := OuterAPIMapKey{
+		o := ExternalAPIMapKey{
 			HostKey: HostKey{
 				Domain: flow.Request.Host,
 				Port:   port,
@@ -74,26 +74,26 @@ func CreateOuterAPIMap(flows map[string]Flow) (OuterAPI, error) {
 		delete(flow.Response.Header, "Connection")
 		delete(flow.Response.Header, "Keep-Alive")
 
-		outerAPI[o] = append(outerAPI[o], OuterAPIResponse{
+		externalAPI[o] = append(externalAPI[o], ExternalAPIResponse{
 			Header: flow.Response.Header,
 		})
 	}
-	return outerAPI, nil
+	return externalAPI, nil
 }
 
-type outerAPI struct {
-	o         OuterAPIMapKey
-	responses []OuterAPIResponse
+type externalAPI struct {
+	o         ExternalAPIMapKey
+	responses []ExternalAPIResponse
 }
 
-func generate(outerAPI OuterAPI) *jen.Statement {
-	sorted := sortedOuterAPI(outerAPI)
+func generate(externalAPI ExternalAPI) *jen.Statement {
+	sorted := sortedExternalAPI(externalAPI)
 	return jen.Func().Id("main").Params().Block(
 		generateMain(sorted)...,
 	)
 }
 
-func generateMain(oa []outerAPI) []jen.Code {
+func generateMain(oa []externalAPI) []jen.Code {
 	var codes []jen.Code
 	for i, api := range oa {
 		codes = append(codes, jen.Id(fmt.Sprintf("srv%d", i)).Op(":=").Func().Params().Qual("net/http", "Server").Block(
@@ -113,10 +113,10 @@ func generateMain(oa []outerAPI) []jen.Code {
 	return codes
 }
 
-func sortedOuterAPI(o OuterAPI) []outerAPI {
-	l := make([]outerAPI, 0, len(o))
+func sortedExternalAPI(o ExternalAPI) []externalAPI {
+	l := make([]externalAPI, 0, len(o))
 	for key, v := range o {
-		l = append(l, outerAPI{key, v})
+		l = append(l, externalAPI{key, v})
 	}
 	sort.Slice(l, func(i, j int) bool {
 		if l[i].o.HostKey.Domain == l[j].o.HostKey.Domain {

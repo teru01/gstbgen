@@ -41,7 +41,7 @@ func TestGenerateMain(t *testing.T) {
 			Body: io.NopCloser(bytes.NewReader([]byte(`{"foo": "bar"}`))),
 		},
 	}
-	o, err := CreateOuterAPIMap(flows)
+	o, err := CreateExternalAPIMap(flows)
 	assert.NoError(t, err)
 	generate(o)
 }
