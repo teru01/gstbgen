@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -112,6 +113,7 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		hosts[hostString] = host
 	}
 	hostsList := make([]SyntaxNode, 0, len(hosts))
+	fmt.Println("hosts:", len(hosts))
 	for _, host := range hosts {
 		hostsList = append(hostsList, &host)
 	}
@@ -150,9 +152,8 @@ func stringifyUrlValues(m url.Values) (string, error) {
 }
 
 func generate(root SyntaxNode) *jen.Statement {
-	return jen.Func().Id("main").Params().Block(
-		append(generateServerFuncs(root, true, true), generateSignalHandler()...)...,
-	)
+	s := jen.Statement(generateServerFuncs(root, true, true))
+	return &s
 }
 
 func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
@@ -161,6 +162,9 @@ func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
 	if len(children) == 0 {
 		return node.render(nil, isFirst, isLast)
 	}
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].value() < children[j].value()
+	})
 	for i, child := range children {
 		var isFirst, isLast bool
 		if i == 0 {
@@ -171,6 +175,8 @@ func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
 		}
 		codes = append(codes, generateServerFuncs(child, isFirst, isLast)...)
 	}
+	fmt.Println("nodevalue: ", node.value())
+	fmt.Printf("%#v\n", codes)
 	return node.render(&codes, isFirst, isLast)
 }
 

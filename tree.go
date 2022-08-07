@@ -13,14 +13,14 @@ type SyntaxNode interface {
 }
 
 var (
-	root            *Root
+	root            = new(Root)
 	hosts           = make(map[string]Host)
 	paths           = make(map[string]Path)
 	methods         = make(map[string]Method)
 	queryParameters = make(map[string]QueryParameter)
 	reqBodies       = make(map[string]ReqBody)
 	respBodies      = make(map[string]RespBody)
-	mockServerPort  int
+	mockServerPort  = 8080
 )
 
 type Node struct {
@@ -50,8 +50,15 @@ type RespBody struct {
 	Children []SyntaxNode
 }
 
-func (h *Root) render(codes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	return []jen.Code{}
+func (h *Root) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
+	var codes []jen.Code
+	codes = append(codes, *childCodes...)
+	codes = append(codes, generateSignalHandler()...)
+	return []jen.Code{
+		jen.Func().Id("main").Params().Block(
+			codes...,
+		),
+	}
 }
 
 func (h *Root) children() []SyntaxNode {
@@ -64,19 +71,20 @@ func (h *Root) value() string {
 
 func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	mockServerPort = nextPort(mockServerPort)
-	var code []jen.Code
-	code = append(code, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
-	code = append(code, *childCodes...)
-	code = append(code,
+	var codes []jen.Code
+	codes = append(codes, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
+	codes = append(codes, *childCodes...)
+	codes = append(codes,
 		jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
 			jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", mockServerPort)),
 			jen.Lit("Handler"): jen.Id("mux"),
 		}),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
+	// return codes
 	return []jen.Code{
 		jen.Func().Params().Block(
-			code...,
+			codes...,
 		).Call(),
 	}
 }
@@ -122,7 +130,7 @@ func (h *RespBody) value() string {
 
 func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	return []jen.Code{
-		jen.If(jen.List(jen.Id("q"), jen.Id("_")).Op(":=").Id("stringifyUrlValues").Call(jen.Id("r").Dot("URL").Dot("Query")), jen.Id("q").Op("==").Lit(h.value())).Block(
+		jen.If(jen.List(jen.Id("q"), jen.Id("_")).Op(":=").Id("stringifyUrlValues").Call(jen.Id("r").Dot("URL").Dot("Query").Call()), jen.Id("q").Op("==").Lit(h.value())).Block(
 			func() []jen.Code {
 				var codes []jen.Code
 				if isFirst {
@@ -132,7 +140,6 @@ func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []
 							jen.Id("rw").Dot("WriteHeader").Call(jen.Qual("net/http", "StatusBadRequest")),
 							jen.Return(),
 						),
-						jen.Id("b").Op(":=").Qual("encoding/json", "Decode").Call(jen.Id("body")),
 					)
 				}
 				codes = append(codes, *childCodes...)
