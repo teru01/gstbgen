@@ -1,6 +1,10 @@
 package main
 
-import "github.com/dave/jennifer/jen"
+import (
+	"fmt"
+
+	"github.com/dave/jennifer/jen"
+)
 
 type SyntaxNode interface {
 	render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code
@@ -16,6 +20,7 @@ var (
 	queryParameters = make(map[string]QueryParameter)
 	reqBodies       = make(map[string]ReqBody)
 	respBodies      = make(map[string]RespBody)
+	mockServerPort  int
 )
 
 type Node struct {
@@ -58,7 +63,22 @@ func (h *Root) value() string {
 }
 
 func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	return []jen.Code{}
+	mockServerPort = nextPort(mockServerPort)
+	var code []jen.Code
+	code = append(code, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
+	code = append(code, *childCodes...)
+	code = append(code,
+		jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
+			jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", mockServerPort)),
+			jen.Lit("Handler"): jen.Id("mux"),
+		}),
+		jen.Go().Id("server").Dot("ListenAndServe").Call(),
+	)
+	return []jen.Code{
+		jen.Func().Params().Block(
+			code...,
+		).Call(),
+	}
 }
 
 func (h *Host) children() []SyntaxNode {
@@ -131,7 +151,9 @@ func (h *QueryParameter) value() string {
 }
 
 func (h *Method) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	return []jen.Code{}
+	return []jen.Code{
+		jen.If(jen.Id("r").Dot("Method").Op("==").Lit(h.value())).Block(*childCodes...),
+	}
 }
 
 func (h *Method) children() []SyntaxNode {
@@ -143,7 +165,11 @@ func (h *Method) value() string {
 }
 
 func (h *Path) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	return []jen.Code{}
+	return []jen.Code{
+		jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(h.value()), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
+			*childCodes...,
+		)),
+	}
 }
 
 func (h *Path) children() []SyntaxNode {
