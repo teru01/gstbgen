@@ -52,7 +52,9 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		delete(flow.Response.Header, "Keep-Alive")
 
 		respBody := RespBody{
-			Value: respBodyString,
+			Value:      respBodyString,
+			Header:     flow.Request.Header,
+			StatusCode: flow.Response.StatusCode,
 		}
 		respBodies[respBodyString] = respBody
 

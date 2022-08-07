@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/dave/jennifer/jen"
 )
@@ -34,6 +35,12 @@ type Path Node
 type Method Node
 type QueryParameter Node
 type ReqBody Node
+type RespBody struct {
+	Value      string
+	Header     http.Header
+	StatusCode int
+	Children   []SyntaxNode
+}
 
 func mergeChild(parent SyntaxNode, child SyntaxNode) []SyntaxNode {
 	children := parent.children()
@@ -43,11 +50,6 @@ func mergeChild(parent SyntaxNode, child SyntaxNode) []SyntaxNode {
 		}
 	}
 	return append(children, child)
-}
-
-type RespBody struct {
-	Value    string
-	Children []SyntaxNode
 }
 
 func (h *Root) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
@@ -80,7 +82,6 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 		}),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
-	// return codes
 	mockServerPort++
 	return []jen.Code{
 		jen.Func().Params().Block(
@@ -113,9 +114,9 @@ func (h *ReqBody) value() string {
 
 func (h *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	return []jen.Code{
+		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(h.StatusCode)),
 		// jen.Qual("fmt", "Fprintf").Call(jen.Id("rw"), jen.Lit("%s"), jen.Id("b")),
 		// TODO
-		jen.Id("rw").Dot("WriteHeader").Call(jen.Qual("net/http", "StatusOK")),
 		jen.Return(),
 	}
 }
