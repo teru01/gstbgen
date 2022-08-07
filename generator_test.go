@@ -45,7 +45,7 @@ func TestGenerateMain(t *testing.T) {
 	}
 	o, err := createExternalAPITree(flows)
 	assert.NoError(t, err)
-	stmt := generate(o)
+	stmt := jen.Statement(generateServerFuncs(o, true, true))
 	assert.Equal(t,
 		`func main() {
 	func() {
@@ -97,7 +97,7 @@ func TestGenerateMain(t *testing.T) {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-sig
-}`, fmt.Sprintf("%#v", stmt))
+}`, fmt.Sprintf("%#v", &stmt))
 }
 
 func TestStringify(t *testing.T) {

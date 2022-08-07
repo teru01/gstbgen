@@ -152,7 +152,11 @@ func stringifyUrlValues(m url.Values) (string, error) {
 }
 
 func generate(root SyntaxNode) *jen.Statement {
-	s := jen.Statement(generateServerFuncs(root, true, true))
+	var codes []jen.Code
+	codes = append(codes, generateStringify()...)
+	codes = append(codes, generateStringifyUrlValues()...)
+	codes = append(codes, generateServerFuncs(root, true, true)...)
+	s := jen.Statement(codes)
 	return &s
 }
 
