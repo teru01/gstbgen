@@ -7,7 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/elazarl/goproxy"
 	"github.com/google/uuid"
@@ -81,11 +83,9 @@ func start(c *cli.Context) error {
 		quit <- struct{}{}
 	}(&svc, quit)
 
-	pressQ := make(chan struct{})
-	if err := openTTY(pressQ); err != nil {
-		return fmt.Errorf("OpenTTY: %w", err)
-	}
-	<-pressQ
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	<-shutdown
 	if err := svc.Shutdown(context.Background()); err != nil {
 		log.Println(err)
 	}

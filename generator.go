@@ -154,7 +154,9 @@ func stringifyUrlValues(m url.Values) (string, error) {
 func generate(root SyntaxNode) *jen.Statement {
 	var codes []jen.Code
 	codes = append(codes, generateStringify()...)
+	codes = append(codes, jen.Line())
 	codes = append(codes, generateStringifyUrlValues()...)
+	codes = append(codes, jen.Line())
 	codes = append(codes, generateServerFuncs(root, true, true)...)
 	s := jen.Statement(codes)
 	return &s
