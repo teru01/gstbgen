@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -24,24 +25,23 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 			port, _ = strconv.Atoi(hostport[1])
 		}
 
-		query, err := json.Marshal(flow.Request.URL.Query())
+		queryString, err := stringifyUrlValues(flow.Request.URL.Query())
 		if err != nil {
-			return nil, err
+			// 失敗しても最低限のコード生成は可能なので続行する
+			queryString = ""
 		}
-		queryString := string(query)
-		// bodyが空orJSONでない場合があるので失敗しても無視する
-		rb, _ := json.Marshal(flow.Request.Body)
-		reqBodyString := string(rb)
 
-		var body []byte
-		if flow.Response.Body != nil {
-			body, err = io.ReadAll(flow.Response.Body)
-			if err != nil {
-				return nil, err
-			}
-			flow.Response.Body.Close()
+		reqBodyString, err := stringify(flow.Request.Body)
+		if err != nil {
+			// 失敗しても最低限のコード生成は可能なので続行する
+			reqBodyString = ""
 		}
-		respBodyString := string(body)
+
+		respBodyString, err := stringify(flow.Response.Body)
+		if err != nil {
+			// 失敗しても最低限のコード生成は可能なので続行する
+			respBodyString = ""
+		}
 
 		delete(flow.Response.Header, "Date")
 		delete(flow.Response.Header, "Content-Type")
@@ -117,6 +117,36 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 	}
 	root.Children = hostsList
 	return root, nil
+}
+
+// JSONに変換できるものはJSON文字列にする
+// できないものはそのまま文字列にして返す
+func stringify(r io.ReadCloser) (string, error) {
+	if r == nil {
+		return "", nil
+	}
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	bm := make(map[string]interface{})
+	if err := json.Unmarshal(body, &bm); err != nil {
+		return string(body), err
+	}
+	if j, err := json.Marshal(bm); err != nil {
+		return string(body), err
+	} else {
+		return string(j), nil
+	}
+}
+
+func stringifyUrlValues(m url.Values) (string, error) {
+	query, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	return string(query), nil
 }
 
 func generate(root SyntaxNode) *jen.Statement {
