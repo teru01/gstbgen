@@ -185,3 +185,39 @@ func generateSignalHandler() []jen.Code {
 		jen.Id("<-sig"),
 	}
 }
+
+func generateStringify() []jen.Code {
+	return []jen.Code{
+		jen.Func().Id("stringify").Params(jen.Id("r").Qual("io", "ReadCloser")).Parens(jen.List(jen.String(), jen.Error())).Block(
+			jen.If(jen.Id("r").Op("==").Nil()).Block(
+				jen.Return(jen.Lit(""), jen.Nil()),
+			),
+			jen.List(jen.Id("body"), jen.Err()).Op(":=").Qual("io", "ReadAll").Call(jen.Id("r")),
+			jen.If(jen.Err().Op("!=").Nil()).Block(
+				jen.Return(jen.Lit(""), jen.Err()),
+			),
+			jen.Defer().Id("r").Dot("Close").Call(),
+			jen.Id("bm").Op(":=").Make(jen.Map(jen.String()).Interface()),
+			jen.If(jen.Err().Op(":=").Qual("encoding/json", "Unmarshal").Call(jen.Id("body"), jen.Op("&").Id("bm")), jen.Err().Op("!=").Nil()).Block(
+				jen.Return(jen.Id("string").Call(jen.Id("body")), jen.Err()),
+			),
+			jen.If(jen.List(jen.Id("j"), jen.Err()).Op(":=").Qual("encoding/json", "Marshal").Call(jen.Id("bm")), jen.Err().Op("!=").Nil()).Block(
+				jen.Return(jen.Id("string").Call(jen.Id("body")), jen.Err()),
+			).Else().Block(
+				jen.Return(jen.Id("string").Call(jen.Id("j")), jen.Nil()),
+			),
+		),
+	}
+}
+
+func generateStringifyUrlValues() []jen.Code {
+	return []jen.Code{
+		jen.Func().Id("stringifyUrlValues").Params(jen.Id("m").Qual("net/url", "Values")).Parens(jen.List(jen.String(), jen.Error())).Block(
+			jen.List(jen.Id("query"), jen.Err()).Op(":=").Qual("encoding/json", "Marshal").Call(jen.Id("m")),
+			jen.If(jen.Err().Op("!=").Nil()).Block(
+				jen.Return(jen.Lit(""), jen.Err()),
+			),
+			jen.Return(jen.Id("string").Call(jen.Id("query")), jen.Nil()),
+		),
+	}
+}

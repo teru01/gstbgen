@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/dave/jennifer/jen"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,21 +100,38 @@ func TestGenerateMain(t *testing.T) {
 }`, fmt.Sprintf("%#v", stmt))
 }
 
-// func TestGenerateServerFuncs(t *testing.T) {
-// 	root := new(Root)
-// 	host := Host{
-// 		Value: "localhost:8080",
-// 		Children: func() []SyntaxNode {
-// 			if h, found := hosts["localhost:8080"]; found {
-// 				return mergeChild(&h, nil)
-// 			}
-// 			return []SyntaxNode{&path}
-// 		}(),
-// 	}
-// 	hostsList := make([]SyntaxNode, 0, len(hosts))
-// 	for _, host := range hosts {
-// 		hostsList = append(hostsList, &host)
-// 	}
-// 	root.Children = hostsList
-// 	assert.Equal(t, generateServerFuncs(root, true, true), []jen.Code{})
-// }
+func TestStringify(t *testing.T) {
+	generated := jen.Statement(generateStringify())
+	assert.Equal(t,
+		`func stringify(r io.ReadCloser) (string, error) {
+	if r == nil {
+		return "", nil
+	}
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	bm := make(map[string]interface{})
+	if err := json.Unmarshal(body, &bm); err != nil {
+		return string(body), err
+	}
+	if j, err := json.Marshal(bm); err != nil {
+		return string(body), err
+	} else {
+		return string(j), nil
+	}
+}`, fmt.Sprintf("%#v", &generated))
+}
+
+func TestGenerateStringifyUrlValues(t *testing.T) {
+	generated := jen.Statement(generateStringifyUrlValues())
+	assert.Equal(t,
+		`func stringifyUrlValues(m url.Values) (string, error) {
+	query, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+	return string(query), nil
+}`, fmt.Sprintf("%#v", &generated))
+}
