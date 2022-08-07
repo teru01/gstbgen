@@ -70,7 +70,6 @@ func (h *Root) value() string {
 }
 
 func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	mockServerPort = nextPort(mockServerPort)
 	var codes []jen.Code
 	codes = append(codes, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
 	codes = append(codes, *childCodes...)
@@ -82,6 +81,7 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
 	// return codes
+	mockServerPort++
 	return []jen.Code{
 		jen.Func().Params().Block(
 			codes...,

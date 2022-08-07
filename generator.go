@@ -113,9 +113,9 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		hosts[hostString] = host
 	}
 	hostsList := make([]SyntaxNode, 0, len(hosts))
-	fmt.Println("hosts:", len(hosts))
 	for _, host := range hosts {
-		hostsList = append(hostsList, &host)
+		h := host
+		hostsList = append(hostsList, &h)
 	}
 	root.Children = hostsList
 	return root, nil
@@ -175,42 +175,8 @@ func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
 		}
 		codes = append(codes, generateServerFuncs(child, isFirst, isLast)...)
 	}
-	fmt.Println("nodevalue: ", node.value())
-	fmt.Printf("%#v\n", codes)
 	return node.render(&codes, isFirst, isLast)
 }
-
-// func generateServer(apis []ExternalAPI) []jen.Code {
-// 	var codes, codesInSameMux, codesInSameHandler []jen.Code
-// 	var prevApi ExternalAPI
-// 	for i, api := range apis {
-// 		if prevApi.key.HostKey.Domain == api.key.HostKey.Domain && prevApi.key.HostKey.Port == api.key.HostKey.Port {
-// 			if prevApi.key.Path == api.key.Path {
-// 				if prevApi.key.ReqValue.Method == api.key.ReqValue.Method {
-// 					if prevApi.key.ReqValue.QueryJSON == api.key.ReqValue.QueryJSON {
-// 					}
-// 				}
-// 				// codesInSameHandler = append(codesInSameHandler, api.render(&codesInSameHandler)...)
-// 			}
-// 			// handlerfunc生成
-// 			hf := jen.Id("mux").Dot("HandleFunc").Call(jen.Lit(api.key.Path), jen.Func().Params(jen.Id("rw").Qual("net/http", "ResponseWriter"), jen.Id("r").Add(jen.Op("*")).Qual("net/http", "Request")).Block(
-// 				codesInSameHandler...,
-// 			))
-// 			codesInSameMux = append(codesInSameMux, hf)
-// 		} else {
-// 			codes = append(codes, jen.Func().Params().Block(
-// 				jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call(),
-// 				jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-// 					jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", nextPort(i))),
-// 					jen.Lit("Handler"): jen.Id("mux"),
-// 				}),
-// 				jen.Go().Id("server").Dot("ListenAndServe").Call(),
-// 			).Call())
-// 		}
-// 		prevApi = api
-// 	}
-// 	return codes
-// }
 
 func generateSignalHandler() []jen.Code {
 	return []jen.Code{
@@ -218,9 +184,4 @@ func generateSignalHandler() []jen.Code {
 		jen.Qual("os/signal", "Notify").Call(jen.Id("sig"), jen.Qual("syscall", "SIGINT"), jen.Qual("syscall", "SIGTERM"), jen.Qual("syscall", "SIGQUIT")),
 		jen.Id("<-sig"),
 	}
-}
-
-func nextPort(i int) int {
-	// TODO: フラグでポート範囲選択
-	return 8080 + i
 }
