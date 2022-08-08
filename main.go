@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -50,23 +51,36 @@ func main() {
 func start(c *cli.Context) error {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		var b bytes.Buffer
 		flowID := uuid.New().String()
+
+		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
+		request := http.Request{
+			URL:    r.URL,
+			Host:   r.Host,
+			Method: r.Method,
+			Body:   io.NopCloser(&b),
+		}
+
 		flows.add(Flow{
 			ID:      flowID,
-			Request: *r,
+			Request: request,
 		})
 		ctx.UserData = flowID
-		_, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-		}
 		log.Printf("%s %s\n", r.Method, r.URL.String())
 		return r, nil
 	})
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		var b bytes.Buffer
+		var response http.Response
 		flowID := ctx.UserData.(string)
-		flows.addResponse(flowID, r)
+
+		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
+		response.StatusCode = r.StatusCode
+		response.Header = r.Header
+		response.Body = io.NopCloser(&b)
+		flows.addResponse(flowID, response)
 		return r
 	})
 

@@ -8,7 +8,7 @@ import (
 type Flow struct {
 	ID       string
 	Request  http.Request
-	Response *http.Response
+	Response http.Response
 }
 
 type Flowsx struct {
@@ -22,7 +22,7 @@ func (f *Flowsx) add(flow Flow) {
 	f.Flows[flow.ID] = flow
 }
 
-func (f *Flowsx) addResponse(flowID string, response *http.Response) {
+func (f *Flowsx) addResponse(flowID string, response http.Response) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	f.Flows[flowID] = Flow{

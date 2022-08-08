@@ -20,7 +20,7 @@ func TestGenerateMain(t *testing.T) {
 			Host:   "localhost:8080",
 			URL:    &url.URL{Path: "/"},
 		},
-		Response: &http.Response{
+		Response: http.Response{
 			StatusCode: 200,
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
@@ -34,7 +34,7 @@ func TestGenerateMain(t *testing.T) {
 			Host:   "localhost:8081",
 			URL:    &url.URL{Path: "/hoge"},
 		},
-		Response: &http.Response{
+		Response: http.Response{
 			StatusCode: 200,
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
