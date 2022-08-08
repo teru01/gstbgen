@@ -115,8 +115,7 @@ func (h *ReqBody) value() string {
 func (h *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	return []jen.Code{
 		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(h.StatusCode)),
-		// jen.Qual("fmt", "Fprintf").Call(jen.Id("rw"), jen.Lit("%s"), jen.Id("b")),
-		// TODO
+		jen.Qual("fmt", "Fprint").Call(jen.Id("rw"), jen.Lit(h.value())),
 		jen.Return(),
 	}
 }

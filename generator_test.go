@@ -59,7 +59,8 @@ func TestGenerateMain(t *testing.T) {
 						return
 					}
 					if body == "" {
-						rw.WriteHeader(http.StatusOK)
+						rw.WriteHeader(200)
+						fmt.Fprint(rw, "{\"foo\":\"bar\"}")
 						return
 					}
 				}
@@ -82,7 +83,8 @@ func TestGenerateMain(t *testing.T) {
 						return
 					}
 					if body == "" {
-						rw.WriteHeader(http.StatusOK)
+						rw.WriteHeader(200)
+						fmt.Fprint(rw, "{\"foo\":\"bar\"}")
 						return
 					}
 				}
