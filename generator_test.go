@@ -67,8 +67,8 @@ func TestGenerateMain(t *testing.T) {
 			}
 		})
 		server := http.Server{
-			"Addr":    "0.0.0.0:8080",
-			"Handler": mux,
+			Addr:    "0.0.0.0:8080",
+			Handler: mux,
 		}
 		go server.ListenAndServe()
 	}()
@@ -91,8 +91,8 @@ func TestGenerateMain(t *testing.T) {
 			}
 		})
 		server := http.Server{
-			"Addr":    "0.0.0.0:8081",
-			"Handler": mux,
+			Addr:    "0.0.0.0:8081",
+			Handler: mux,
 		}
 		go server.ListenAndServe()
 	}()

@@ -77,8 +77,8 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	codes = append(codes, *childCodes...)
 	codes = append(codes,
 		jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-			jen.Lit("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", mockServerPort)),
-			jen.Lit("Handler"): jen.Id("mux"),
+			jen.Id("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", mockServerPort)),
+			jen.Id("Handler"): jen.Id("mux"),
 		}),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
@@ -113,6 +113,7 @@ func (h *ReqBody) value() string {
 }
 
 func (h *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
+	fmt.Println("render", h.value())
 	return []jen.Code{
 		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(h.StatusCode)),
 		jen.Qual("fmt", "Fprint").Call(jen.Id("rw"), jen.Lit(h.value())),
