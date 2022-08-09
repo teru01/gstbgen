@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -90,22 +91,14 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 			}
 			qs.addChild(req)
 		}
-		if res, found = req.children()[respBodyString]; !found {
-			res = &RespBody{
-				Value:      respBodyString,
-				Children:   make(map[string]SyntaxNode),
-				StatusCode: flow.Response.StatusCode,
-				Header:     flow.Response.Header,
-			}
-			req.addChild(res)
+
+		res = &RespBody{
+			Value:      respBodyString,
+			StatusCode: flow.Response.StatusCode,
+			Header:     flow.Response.Header,
 		}
+		req.addChild(res)
 	}
-	// hostsList := make([]SyntaxNode, 0, len(hosts))
-	// for _, host := range hosts {
-	// 	h := host
-	// 	hostsList = append(hostsList, &h)
-	// }
-	// root.Children = hostsList
 	return root, nil
 }
 
@@ -140,6 +133,14 @@ func stringifyUrlValues(m url.Values) (string, error) {
 		return "", err
 	}
 	return string(query), nil
+}
+
+func stringifyHeader(h http.Header) (string, error) {
+	header, err := json.Marshal(h)
+	if err != nil {
+		return "", err
+	}
+	return string(header), nil
 }
 
 func generate(root SyntaxNode) *jen.Statement {

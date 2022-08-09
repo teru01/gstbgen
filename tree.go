@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/dave/jennifer/jen"
@@ -112,13 +113,19 @@ func (h *ReqBody) value() string {
 	return h.Value
 }
 
-func (h *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	fmt.Println("render", h.value())
-	return []jen.Code{
-		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(h.StatusCode)),
-		jen.Qual("fmt", "Fprintln").Call(jen.Id("rw"), jen.Lit(h.value())),
-		jen.Return(),
+func (r *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
+	fmt.Println("render", r.value())
+	var codes []jen.Code
+	for k, vv := range r.Header {
+		for _, v := range vv {
+			codes = append(codes, jen.Id("rw").Dot("Header").Call().Dot("Set").Call(jen.Lit(k), jen.Lit(v)))
+		}
 	}
+	return append(codes, []jen.Code{
+		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(r.StatusCode)),
+		jen.Qual("fmt", "Fprintln").Call(jen.Id("rw"), jen.Lit(r.Value)),
+		jen.Return(),
+	}...)
 }
 
 func (h *RespBody) children() map[string]SyntaxNode {
@@ -126,11 +133,11 @@ func (h *RespBody) children() map[string]SyntaxNode {
 }
 
 func (h *RespBody) addChild(child SyntaxNode) {
-	h.Children[child.value()] = child
+	fmt.Errorf("not supported")
 }
 
 func (h *RespBody) value() string {
-	return h.Value
+	return createResponseKey(h)
 }
 
 func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
@@ -202,4 +209,13 @@ func (h *Path) addChild(child SyntaxNode) {
 
 func (h *Path) value() string {
 	return h.Value
+}
+
+func createResponseKey(r *RespBody) string {
+	header, err := stringifyHeader(r.Header)
+	if err != nil {
+		// 失敗しても最低限のコード生成は可能なので続行する
+		log.Println(err)
+	}
+	return fmt.Sprintf("%d-%s-%s", r.StatusCode, header, r.Value)
 }
