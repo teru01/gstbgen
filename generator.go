@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"sort"
 	"strconv"
@@ -29,19 +30,19 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		queryString, err := stringifyUrlValues(flow.Request.URL.Query())
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			queryString = ""
+			log.Println(err)
 		}
 
 		reqBodyString, err := stringify(flow.Request.Body)
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			reqBodyString = ""
+			log.Println(err)
 		}
 
 		respBodyString, err := stringify(flow.Response.Body)
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			respBodyString = ""
+			log.Println(err)
 		}
 
 		delete(flow.Response.Header, "Date")
@@ -51,75 +52,60 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		delete(flow.Response.Header, "Connection")
 		delete(flow.Response.Header, "Keep-Alive")
 
-		respBody := RespBody{
-			Value:      respBodyString,
-			Header:     flow.Request.Header,
-			StatusCode: flow.Response.StatusCode,
-		}
-		respBodies[respBodyString] = respBody
-
-		reqBody := ReqBody{
-			Value: reqBodyString,
-			Children: func() []SyntaxNode {
-				if r, found := reqBodies[reqBodyString]; found {
-					return mergeChild(&r, &respBody)
-				}
-				return []SyntaxNode{&respBody}
-			}(),
-		}
-		reqBodies[reqBodyString] = reqBody
-
-		queryParameter := QueryParameter{
-			Value: queryString,
-			Children: func() []SyntaxNode {
-				if q, found := queryParameters[queryString]; found {
-					return mergeChild(&q, &reqBody)
-				}
-				return []SyntaxNode{&reqBody}
-			}(),
-		}
-		queryParameters[queryString] = queryParameter
-
-		method := Method{
-			Value: flow.Request.Method,
-			Children: func() []SyntaxNode {
-				if m, found := methods[flow.Request.Method]; found {
-					return mergeChild(&m, &queryParameter)
-				}
-				return []SyntaxNode{&queryParameter}
-			}(),
-		}
-		methods[method.Value] = method
-
-		path := Path{
-			Value: flow.Request.URL.Path,
-			Children: func() []SyntaxNode {
-				if p, found := paths[flow.Request.URL.Path]; found {
-					return mergeChild(&p, &method)
-				}
-				return []SyntaxNode{&method}
-			}(),
-		}
-		paths[path.Value] = path
-
+		var host, path, method, qs, req, res SyntaxNode
+		var found bool
 		hostString := fmt.Sprintf("%s:%d", flow.Request.Host, port)
-		host := Host{
-			Value: hostString,
-			Children: func() []SyntaxNode {
-				if h, found := hosts[hostString]; found {
-					return mergeChild(&h, &path)
-				}
-				return []SyntaxNode{&path}
-			}(),
+		if host, found = root.children()[hostString]; !found {
+			host = &Host{
+				Value:    hostString,
+				Children: make(map[string]SyntaxNode),
+			}
+			root.addChild(host)
 		}
-		hosts[hostString] = host
+		if path, found = host.children()[flow.Request.URL.Path]; !found {
+			path = &Path{
+				Value:    flow.Request.URL.Path,
+				Children: make(map[string]SyntaxNode),
+			}
+			host.addChild(path)
+		}
+		if method, found = path.children()[flow.Request.Method]; !found {
+			method = &Method{
+				Value:    flow.Request.Method,
+				Children: make(map[string]SyntaxNode),
+			}
+			path.addChild(method)
+		}
+		if qs, found = method.children()[queryString]; !found {
+			qs = &QueryParameter{
+				Value:    queryString,
+				Children: make(map[string]SyntaxNode),
+			}
+			method.addChild(qs)
+		}
+		if req, found = qs.children()[reqBodyString]; !found {
+			req = &ReqBody{
+				Value:    reqBodyString,
+				Children: make(map[string]SyntaxNode),
+			}
+			qs.addChild(req)
+		}
+		if res, found = req.children()[respBodyString]; !found {
+			res = &RespBody{
+				Value:      respBodyString,
+				Children:   make(map[string]SyntaxNode),
+				StatusCode: flow.Response.StatusCode,
+				Header:     flow.Response.Header,
+			}
+			req.addChild(res)
+		}
 	}
-	hostsList := make([]SyntaxNode, 0, len(hosts))
-	for _, host := range hosts {
-		h := host
-		hostsList = append(hostsList, &h)
-	}
-	root.Children = hostsList
+	// hostsList := make([]SyntaxNode, 0, len(hosts))
+	// for _, host := range hosts {
+	// 	h := host
+	// 	hostsList = append(hostsList, &h)
+	// }
+	// root.Children = hostsList
 	return root, nil
 }
 
@@ -136,11 +122,14 @@ func stringify(r io.ReadCloser) (string, error) {
 	defer r.Close()
 	bm := make(map[string]interface{})
 	if err := json.Unmarshal(body, &bm); err != nil {
+		fmt.Println("stringify", string(body))
 		return string(body), err
 	}
 	if j, err := json.Marshal(bm); err != nil {
+		fmt.Println("stringify", string(body))
 		return string(body), err
 	} else {
+		fmt.Println("stringify", string(j))
 		return string(j), nil
 	}
 }
@@ -165,15 +154,24 @@ func generate(root SyntaxNode) *jen.Statement {
 }
 
 func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
+	fmt.Println("in gen", node.value())
 	var codes []jen.Code
 	children := node.children()
 	if len(children) == 0 {
 		return node.render(nil, isFirst, isLast)
 	}
-	sort.Slice(children, func(i, j int) bool {
-		return children[i].value() < children[j].value()
+	childrenList := make([]SyntaxNode, 0, len(children))
+	for _, child := range children {
+		childrenList = append(childrenList, child)
+	}
+	sort.Slice(childrenList, func(i, j int) bool {
+		return childrenList[i].value() < childrenList[j].value()
 	})
-	for i, child := range children {
+	if _, ok := node.(*ReqBody); ok {
+		fmt.Println("value is reqbody", node.value())
+		fmt.Println("value is reqbody, childer len: ", len(children))
+	}
+	for i, child := range childrenList {
 		var isFirst, isLast bool
 		if i == 0 {
 			isFirst = true

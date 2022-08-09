@@ -75,7 +75,9 @@ func start(c *cli.Context) error {
 		var b bytes.Buffer
 		var response http.Response
 		flowID := ctx.UserData.(string)
-
+		if r.Body == nil {
+			fmt.Println("nil")
+		}
 		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
 		response.StatusCode = r.StatusCode
 		response.Header = r.Header

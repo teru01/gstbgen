@@ -9,24 +9,22 @@ import (
 
 type SyntaxNode interface {
 	render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code
-	children() []SyntaxNode
+	children() map[string]SyntaxNode
+	addChild(child SyntaxNode)
 	value() string
 }
 
 var (
-	root            = new(Root)
-	hosts           = make(map[string]Host)
-	paths           = make(map[string]Path)
-	methods         = make(map[string]Method)
-	queryParameters = make(map[string]QueryParameter)
-	reqBodies       = make(map[string]ReqBody)
-	respBodies      = make(map[string]RespBody)
-	mockServerPort  = 8080
+	root = &Root{
+		Value:    "",
+		Children: make(map[string]SyntaxNode),
+	}
+	mockServerPort = 8080
 )
 
 type Node struct {
 	Value    string
-	Children []SyntaxNode
+	Children map[string]SyntaxNode
 }
 
 type Root Node
@@ -36,20 +34,10 @@ type Method Node
 type QueryParameter Node
 type ReqBody Node
 type RespBody struct {
-	Value      string
 	Header     http.Header
 	StatusCode int
-	Children   []SyntaxNode
-}
-
-func mergeChild(parent SyntaxNode, child SyntaxNode) []SyntaxNode {
-	children := parent.children()
-	for _, c := range children {
-		if c.value() == child.value() {
-			return children
-		}
-	}
-	return append(children, child)
+	Value      string
+	Children   map[string]SyntaxNode
 }
 
 func (h *Root) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
@@ -63,8 +51,12 @@ func (h *Root) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	}
 }
 
-func (h *Root) children() []SyntaxNode {
+func (h *Root) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *Root) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *Root) value() string {
@@ -90,8 +82,12 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	}
 }
 
-func (h *Host) children() []SyntaxNode {
+func (h *Host) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *Host) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *Host) value() string {
@@ -104,8 +100,12 @@ func (h *ReqBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Cod
 	}
 }
 
-func (h *ReqBody) children() []SyntaxNode {
+func (h *ReqBody) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *ReqBody) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *ReqBody) value() string {
@@ -116,13 +116,17 @@ func (h *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Co
 	fmt.Println("render", h.value())
 	return []jen.Code{
 		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(h.StatusCode)),
-		jen.Qual("fmt", "Fprint").Call(jen.Id("rw"), jen.Lit(h.value())),
+		jen.Qual("fmt", "Fprintln").Call(jen.Id("rw"), jen.Lit(h.value())),
 		jen.Return(),
 	}
 }
 
-func (h *RespBody) children() []SyntaxNode {
+func (h *RespBody) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *RespBody) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *RespBody) value() string {
@@ -150,8 +154,12 @@ func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []
 	}
 }
 
-func (h *QueryParameter) children() []SyntaxNode {
+func (h *QueryParameter) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *QueryParameter) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *QueryParameter) value() string {
@@ -164,8 +172,12 @@ func (h *Method) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code
 	}
 }
 
-func (h *Method) children() []SyntaxNode {
+func (h *Method) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *Method) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *Method) value() string {
@@ -180,8 +192,12 @@ func (h *Path) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	}
 }
 
-func (h *Path) children() []SyntaxNode {
+func (h *Path) children() map[string]SyntaxNode {
 	return h.Children
+}
+
+func (h *Path) addChild(child SyntaxNode) {
+	h.Children[child.value()] = child
 }
 
 func (h *Path) value() string {
