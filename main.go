@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -24,7 +23,6 @@ var flows = &Flowsx{
 }
 
 func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -57,25 +55,18 @@ func main() {
 }
 
 func start(c *cli.Context) error {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	if c.Bool("debug") {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-
+	initLog(c)
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		var b bytes.Buffer
 		flowID := uuid.New().String()
-
-		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
+		var reqBody io.ReadCloser
+		r.Body, reqBody = duplicateReadCloser(r.Body)
 		request := http.Request{
 			URL:    r.URL,
 			Host:   r.Host,
 			Method: r.Method,
-			Body:   io.NopCloser(&b),
+			Body:   reqBody,
 		}
-
 		flows.add(Flow{
 			ID:      flowID,
 			Request: request,
@@ -86,16 +77,14 @@ func start(c *cli.Context) error {
 	})
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		var b bytes.Buffer
-		var response http.Response
 		flowID := ctx.UserData.(string)
-		if r.Body == nil {
-			fmt.Println("nil")
+		var respBody io.ReadCloser
+		r.Body, respBody = duplicateReadCloser(r.Body)
+		response := http.Response{
+			StatusCode: r.StatusCode,
+			Header:     r.Header,
+			Body:       respBody,
 		}
-		r.Body = io.NopCloser(io.TeeReader(r.Body, &b))
-		response.StatusCode = r.StatusCode
-		response.Header = r.Header
-		response.Body = io.NopCloser(&b)
 		flows.addResponse(flowID, response)
 		return r
 	})
@@ -127,4 +116,13 @@ func start(c *cli.Context) error {
 	fmt.Printf("%#v", stmt)
 	<-quit
 	return nil
+}
+
+func initLog(c *cli.Context) {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	if c != nil && c.Bool("debug") {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
 }

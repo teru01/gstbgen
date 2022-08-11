@@ -13,6 +13,7 @@ import (
 )
 
 func TestGenerateMain(t *testing.T) {
+	initLog(nil)
 	flows := map[string]Flow{}
 	flows["1"] = Flow{
 		Request: http.Request{

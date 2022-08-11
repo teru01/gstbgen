@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"sync"
 )
@@ -32,6 +34,29 @@ func (f *Flowsx) addResponse(flowID string, response http.Response) {
 	}
 }
 
-// func (f *Flowsx) Get(flowID string) Flow {
+func duplicateReadCloser(rc io.ReadCloser) (original io.ReadCloser, duplicated io.ReadCloser) {
+	var b bytes.Buffer
+	original = teeReadCloser(rc, &b)
+	return original, io.NopCloser(&b)
+}
 
-// }
+func teeReadCloser(rc io.ReadCloser, w io.Writer) Body {
+	n := io.TeeReader(rc, w)
+	return Body{
+		c: rc,
+		b: n,
+	}
+}
+
+type Body struct {
+	c io.Closer
+	b io.Reader
+}
+
+func (body Body) Close() error {
+	return body.c.Close()
+}
+
+func (body Body) Read(p []byte) (n int, err error) {
+	return body.b.Read(p)
+}
