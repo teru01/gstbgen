@@ -32,7 +32,7 @@ func main() {
 				Value:   "0.0.0.0",
 				Usage:   "listening host",
 			},
-			&cli.Int64Flag{
+			&cli.IntFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
 				Value:   8080,
@@ -43,6 +43,12 @@ func main() {
 				Aliases: []string{"d"},
 				Value:   false,
 				Usage:   "enable debug log",
+			},
+			&cli.IntFlag{
+				Name:    "mockBeginPort",
+				Aliases: []string{"m"},
+				Value:   8080,
+				Usage:   "begin port of generated mock server",
 			},
 		},
 		Name:   "gprogen",
@@ -57,6 +63,7 @@ func main() {
 
 func start(c *cli.Context) error {
 	initLog(c)
+	mockServerPort = c.Int("mockBeginPort")
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		flowID := uuid.New().String()
