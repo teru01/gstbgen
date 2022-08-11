@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/dave/jennifer/jen"
+	"github.com/rs/zerolog/log"
 )
 
 type SyntaxNode interface {
@@ -114,7 +114,6 @@ func (h *ReqBody) value() string {
 }
 
 func (r *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	fmt.Println("render", r.value())
 	var codes []jen.Code
 	for k, vv := range r.Header {
 		for _, v := range vv {
@@ -133,7 +132,7 @@ func (h *RespBody) children() map[string]SyntaxNode {
 }
 
 func (h *RespBody) addChild(child SyntaxNode) {
-	fmt.Errorf("not supported")
+	log.Error().Msg("not supported")
 }
 
 func (h *RespBody) value() string {
@@ -215,7 +214,7 @@ func createResponseKey(r *RespBody) string {
 	header, err := stringifyHeader(r.Header)
 	if err != nil {
 		// 失敗しても最低限のコード生成は可能なので続行する
-		log.Println(err)
+		log.Error().Err(err)
 	}
 	return fmt.Sprintf("%d-%s-%s", r.StatusCode, header, r.Value)
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/elazarl/goproxy"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -23,6 +24,7 @@ var flows = &Flowsx{
 }
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	app := &cli.App{
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -37,6 +39,12 @@ func main() {
 				Value:   8080,
 				Usage:   "listening port",
 			},
+			&cli.BoolFlag{
+				Name:    "debug",
+				Aliases: []string{"d"},
+				Value:   false,
+				Usage:   "enable debug log",
+			},
 		},
 		Name:   "gprogen",
 		Usage:  "Go proxy and stub generator for load test",
@@ -44,11 +52,17 @@ func main() {
 	}
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatalf("%+v\n", err)
+		log.Error().Err(err).Msgf("%+v", err)
 	}
 }
 
 func start(c *cli.Context) error {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	if c.Bool("debug") {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
+
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		var b bytes.Buffer
@@ -67,7 +81,7 @@ func start(c *cli.Context) error {
 			Request: request,
 		})
 		ctx.UserData = flowID
-		log.Printf("%s %s\n", r.Method, r.URL.String())
+		log.Info().Msgf("%s %s", r.Method, r.URL.String())
 		return r, nil
 	})
 
@@ -92,9 +106,9 @@ func start(c *cli.Context) error {
 	}
 	quit := make(chan struct{})
 	go func(svc *http.Server, quit chan struct{}) {
-		log.Println("listening on", svc.Addr)
+		log.Info().Msgf("listening on %v", svc.Addr)
 		if err := svc.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Error().Err(err)
 		}
 		quit <- struct{}{}
 	}(&svc, quit)
@@ -103,7 +117,7 @@ func start(c *cli.Context) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-shutdown
 	if err := svc.Shutdown(context.Background()); err != nil {
-		log.Println(err)
+		log.Error().Err(err)
 	}
 	root, err := createExternalAPITree(flows.Flows)
 	if err != nil {

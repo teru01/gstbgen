@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dave/jennifer/jen"
+	"github.com/rs/zerolog/log"
 )
 
 func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
@@ -31,19 +31,19 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		queryString, err := stringifyUrlValues(flow.Request.URL.Query())
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			log.Println(err)
+			log.Error().Err(err)
 		}
 
 		reqBodyString, err := stringify(flow.Request.Body)
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			log.Println(err)
+			log.Error().Err(err)
 		}
 
 		respBodyString, err := stringify(flow.Response.Body)
 		if err != nil {
 			// 失敗しても最低限のコード生成は可能なので続行する
-			log.Println(err)
+			log.Error().Err(err)
 		}
 
 		delete(flow.Response.Header, "Date")
@@ -115,14 +115,11 @@ func stringify(r io.ReadCloser) (string, error) {
 	defer r.Close()
 	bm := make(map[string]interface{})
 	if err := json.Unmarshal(body, &bm); err != nil {
-		fmt.Println("stringify", string(body))
 		return string(body), err
 	}
 	if j, err := json.Marshal(bm); err != nil {
-		fmt.Println("stringify", string(body))
 		return string(body), err
 	} else {
-		fmt.Println("stringify", string(j))
 		return string(j), nil
 	}
 }
@@ -155,7 +152,7 @@ func generate(root SyntaxNode) *jen.Statement {
 }
 
 func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
-	fmt.Println("in gen", node.value())
+	log.Debug().Msgf("current node %s\n", node.value())
 	var codes []jen.Code
 	children := node.children()
 	if len(children) == 0 {
@@ -168,10 +165,6 @@ func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
 	sort.Slice(childrenList, func(i, j int) bool {
 		return childrenList[i].value() < childrenList[j].value()
 	})
-	if _, ok := node.(*ReqBody); ok {
-		fmt.Println("value is reqbody", node.value())
-		fmt.Println("value is reqbody, childer len: ", len(children))
-	}
 	for i, child := range childrenList {
 		var isFirst, isLast bool
 		if i == 0 {
