@@ -123,7 +123,7 @@ func (r *RespBody) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Co
 	}
 	return append(codes, []jen.Code{
 		jen.Id("rw").Dot("WriteHeader").Call(jen.Lit(r.StatusCode)),
-		jen.Qual("fmt", "Fprintln").Call(jen.Id("rw"), jen.Lit(r.Value)),
+		jen.Qual("fmt", "Fprint").Call(jen.Id("rw"), jen.Lit(r.Value)),
 		jen.Return(),
 	}...)
 }

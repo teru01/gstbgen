@@ -83,6 +83,7 @@ func TestGenerateMain(t *testing.T) {
 						return
 					}
 					if body == "" {
+						rw.Header().Set("X-Foo", "foo")
 						rw.WriteHeader(200)
 						fmt.Fprint(rw, "{\"foo\":\"bar\"}")
 						return
