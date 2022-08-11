@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/elazarl/goproxy"
 	"github.com/google/uuid"
@@ -126,9 +127,15 @@ func start(c *cli.Context) error {
 }
 
 func initLog(c *cli.Context) {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	jst, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		panic(err)
+	}
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	zerolog.TimestampFunc = func() time.Time {
+		return time.Now().In(jst)
+	}
 	if c != nil && c.Bool("debug") {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
