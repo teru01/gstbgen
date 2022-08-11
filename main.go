@@ -67,25 +67,30 @@ func start(c *cli.Context) error {
 			Method: r.Method,
 			Body:   reqBody,
 		}
-		flows.add(Flow{
+		ctx.UserData = Flow{
 			ID:      flowID,
 			Request: request,
-		})
-		ctx.UserData = flowID
-		log.Info().Msgf("%s %s", r.Method, r.URL.String())
+		}
 		return r, nil
 	})
 
 	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		flowID := ctx.UserData.(string)
+		flow := ctx.UserData.(Flow)
 		var respBody io.ReadCloser
-		r.Body, respBody = duplicateReadCloser(r.Body)
+		if r == nil {
+			log.Warn().Msgf("%s %s", ctx.Req.Method, ctx.Req.URL.String())
+			return r
+		} else {
+			r.Body, respBody = duplicateReadCloser(r.Body)
+		}
 		response := http.Response{
 			StatusCode: r.StatusCode,
 			Header:     r.Header,
 			Body:       respBody,
 		}
-		flows.addResponse(flowID, response)
+		flow.Response = response
+		flows.add(flow)
+		log.Info().Msgf("%s %s", r.Request.Method, r.Request.URL.String())
 		return r
 	})
 
