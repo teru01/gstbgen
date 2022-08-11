@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/dave/jennifer/jen"
@@ -16,16 +15,16 @@ import (
 
 func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 	for _, flow := range flows {
-		var port int
+		var hostString string
 		hostport := strings.Split(flow.Request.Host, ":")
 		if len(hostport) == 1 {
 			if flow.Request.URL.Scheme == "https" {
-				port = 443
+				hostString = fmt.Sprintf("%s:%d", flow.Request.Host, 443)
 			} else {
-				port = 80
+				hostString = fmt.Sprintf("%s:%d", flow.Request.Host, 80)
 			}
 		} else {
-			port, _ = strconv.Atoi(hostport[1])
+			hostString = flow.Request.Host
 		}
 
 		queryString, err := stringifyUrlValues(flow.Request.URL.Query())
@@ -52,10 +51,11 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		delete(flow.Response.Header, "Server")
 		delete(flow.Response.Header, "Connection")
 		delete(flow.Response.Header, "Keep-Alive")
+		delete(flow.Response.Header, "Cache-Control")
+		delete(flow.Response.Header, "Expires")
 
 		var host, path, method, qs, req, res SyntaxNode
 		var found bool
-		hostString := fmt.Sprintf("%s:%d", flow.Request.Host, port)
 		if host, found = root.children()[hostString]; !found {
 			host = &Host{
 				Value:    hostString,
@@ -150,6 +150,8 @@ func generate(root SyntaxNode) *jen.Statement {
 	codes = append(codes, generateStringifyUrlValues()...)
 	codes = append(codes, jen.Line())
 	codes = append(codes, generateServerFuncs(root, true, true)...)
+	codes = append(codes, jen.Line())
+	codes = append(codes, generateMapComment(externalAPIToMockServerMap)...)
 	s := jen.Statement(codes)
 	return &s
 }
@@ -224,5 +226,16 @@ func generateStringifyUrlValues() []jen.Code {
 			jen.Return(jen.Id("string").Call(jen.Id("query")), jen.Nil()),
 		),
 		jen.Line(),
+	}
+}
+
+func generateMapComment(m map[string]int) []jen.Code {
+	var comment string
+	comment += fmt.Sprintf("%s\n", "map of external API to mock server listen port")
+	for k, v := range externalAPIToMockServerMap {
+		comment += fmt.Sprintf("%v: %v\n", k, v)
+	}
+	return []jen.Code{
+		jen.Comment(comment),
 	}
 }

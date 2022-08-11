@@ -20,7 +20,8 @@ var (
 		Value:    "",
 		Children: make(map[string]SyntaxNode),
 	}
-	mockServerPort = 8080
+	mockServerPort             = 8080
+	externalAPIToMockServerMap = make(map[string]int)
 )
 
 type Node struct {
@@ -66,15 +67,17 @@ func (h *Root) value() string {
 
 func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	var codes []jen.Code
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", mockServerPort)
 	codes = append(codes, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
 	codes = append(codes, *childCodes...)
 	codes = append(codes,
 		jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-			jen.Id("Addr"):    jen.Lit(fmt.Sprintf("0.0.0.0:%d", mockServerPort)),
+			jen.Id("Addr"):    jen.Lit(listenAddr),
 			jen.Id("Handler"): jen.Id("mux"),
 		}),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
+	externalAPIToMockServerMap[h.value()] = mockServerPort
 	mockServerPort++
 	return []jen.Code{
 		jen.Func().Params().Block(

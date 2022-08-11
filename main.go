@@ -127,7 +127,7 @@ func start(c *cli.Context) error {
 	}
 	stmt := generate(root)
 	if stmt != nil {
-		fmt.Printf("%#v", stmt)
+		fmt.Printf("%#v\n", stmt)
 	}
 	<-quit
 	return nil
