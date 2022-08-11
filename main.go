@@ -113,7 +113,9 @@ func start(c *cli.Context) error {
 		return fmt.Errorf("generate: %w", err)
 	}
 	stmt := generate(root)
-	fmt.Printf("%#v", stmt)
+	if stmt != nil {
+		fmt.Printf("%#v", stmt)
+	}
 	<-quit
 	return nil
 }

@@ -141,6 +141,9 @@ func stringifyHeader(h http.Header) (string, error) {
 }
 
 func generate(root SyntaxNode) *jen.Statement {
+	if len(root.children()) == 0 {
+		return nil
+	}
 	var codes []jen.Code
 	codes = append(codes, generateStringify()...)
 	codes = append(codes, jen.Line())
@@ -207,6 +210,7 @@ func generateStringify() []jen.Code {
 				jen.Return(jen.Id("string").Call(jen.Id("j")), jen.Nil()),
 			),
 		),
+		jen.Line(),
 	}
 }
 
@@ -219,5 +223,6 @@ func generateStringifyUrlValues() []jen.Code {
 			),
 			jen.Return(jen.Id("string").Call(jen.Id("query")), jen.Nil()),
 		),
+		jen.Line(),
 	}
 }
