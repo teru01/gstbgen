@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dave/jennifer/jen"
 	"github.com/elazarl/goproxy"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -58,6 +60,11 @@ func main() {
 				Name:  "key",
 				Usage: "certificate key path",
 			},
+			&cli.StringFlag{
+				Name:    "out",
+				Aliases: []string{"o"},
+				Usage:   "generated stub server code path(default: stdout)",
+			},
 		},
 		Name:   "gprogen",
 		Usage:  "Go proxy and stub generator for load test",
@@ -101,7 +108,23 @@ func start(c *cli.Context) error {
 	}
 	stmt := generate(root)
 	if stmt != nil {
-		fmt.Printf("%#v\n", stmt)
+		f := jen.NewFile("main")
+		f.Add(stmt)
+		var buf bytes.Buffer
+		if err := f.Render(&buf); err != nil {
+			return fmt.Errorf("faield to render: %w", err)
+		}
+		if c.String("out") == "" {
+			fmt.Println(buf.String())
+		} else {
+			out, err := os.OpenFile(c.String("out"), os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				return fmt.Errorf("failed to open file: %w", err)
+			}
+			if _, err := io.Copy(out, &buf); err != nil {
+				return fmt.Errorf("failed to write file: %w", err)
+			}
+		}
 	}
 	<-quit
 	return nil
