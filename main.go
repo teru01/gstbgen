@@ -18,9 +18,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var flows = &Flowsx{
-	Flows: make(map[string]Flow),
-	mutex: sync.Mutex{},
+type GenProxy struct {
+	proxy *goproxy.ProxyHttpServer
+	flows *Flowsx
 }
 
 func main() {
@@ -72,13 +72,13 @@ func main() {
 func start(c *cli.Context) error {
 	initLog(c)
 	mockServerPort = c.Int("mockBeginPort")
-	proxy := NewProxy()
+	proxy := NewGenProxy()
 	if c.String("cert") != "" && c.String("key") != "" {
-		enableHttpsProxy(c, proxy)
+		enableHttpsProxy(c, proxy.Proxy())
 	}
 	svc := http.Server{
 		Addr:    c.String("host") + ":" + c.String("port"),
-		Handler: proxy,
+		Handler: proxy.Proxy(),
 	}
 	quit := make(chan struct{})
 	go func(svc *http.Server, quit chan struct{}) {
@@ -95,7 +95,7 @@ func start(c *cli.Context) error {
 	if err := svc.Shutdown(context.Background()); err != nil {
 		return fmt.Errorf("failed to shutdown: %w", err)
 	}
-	root, err := createExternalAPITree(flows.Flows)
+	root, err := createExternalAPITree(proxy.Flows())
 	if err != nil {
 		return fmt.Errorf("generate: %w", err)
 	}
@@ -122,9 +122,12 @@ func initLog(c *cli.Context) {
 	}
 }
 
-func NewProxy() *goproxy.ProxyHttpServer {
+func NewGenProxy() *GenProxy {
 	proxy := goproxy.NewProxyHttpServer()
-
+	flows := &Flowsx{
+		Flows: make(map[string]Flow),
+		mutex: sync.Mutex{},
+	}
 	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		flowID := uuid.New().String()
 		var reqBody io.ReadCloser
@@ -161,5 +164,16 @@ func NewProxy() *goproxy.ProxyHttpServer {
 		log.Info().Msgf("%s %s", r.Request.Method, r.Request.URL.String())
 		return r
 	})
-	return proxy
+	return &GenProxy{
+		proxy: proxy,
+		flows: flows,
+	}
+}
+
+func (p *GenProxy) Proxy() *goproxy.ProxyHttpServer {
+	return p.proxy
+}
+
+func (p *GenProxy) Flows() map[string]Flow {
+	return p.flows.Flows
 }

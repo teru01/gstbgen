@@ -65,16 +65,17 @@ type FlowTest struct {
 }
 
 func TestProxy(t *testing.T) {
-	flows := createFlows()
-	es := NewEndServer(flows)
-	pserver := httptest.NewServer(NewProxy())
+	testFlows := createFlows()
+	es := NewEndServer(testFlows)
+	p := NewGenProxy()
+	pserver := httptest.NewServer(p.Proxy())
 	url, _ := url.Parse(pserver.URL)
 	c := http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyURL(url),
 		},
 	}
-	for _, flow := range flows {
+	for _, flow := range testFlows {
 		resp, err := es.request(&c, &flow.Request)
 		assert.NoError(t, err)
 		actual, err := io.ReadAll(resp.Body)
@@ -125,4 +126,12 @@ func createFlows() []FlowTest {
 		},
 	}
 	return flows
+}
+
+func createFlowsFromFlowTests(tfs []FlowTest) []Flow {
+	var fs []Flow
+	for _, tf := range tfs {
+		fs = append(fs, tf.Flow)
+	}
+	return fs
 }
