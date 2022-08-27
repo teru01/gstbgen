@@ -68,6 +68,7 @@ func TestGenerateMain(t *testing.T) {
 			Addr:    "0.0.0.0:8080",
 			Handler: mux,
 		}
+		fmt.Printf("Listening on %v\n", server.Addr)
 		go server.ListenAndServe()
 	}()
 	func() {
@@ -89,6 +90,7 @@ func TestGenerateMain(t *testing.T) {
 			Addr:    "0.0.0.0:8081",
 			Handler: mux,
 		}
+		fmt.Printf("Listening on %v\n", server.Addr)
 		go server.ListenAndServe()
 	}()
 	sig := make(chan os.Signal)

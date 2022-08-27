@@ -75,6 +75,7 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 			jen.Id("Addr"):    jen.Lit(listenAddr),
 			jen.Id("Handler"): jen.Id("mux"),
 		}),
+		jen.Qual("fmt", "Printf").Call(jen.Lit("Listening on %v\n"), jen.Id("server").Dot("Addr")),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
 	externalAPIToMockServerMap[h.value()] = mockServerPort
