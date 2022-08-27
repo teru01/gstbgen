@@ -31,18 +31,17 @@ type ResponseContent struct {
 }
 
 func (e *EndServer) request(c *http.Client, r *http.Request) (*http.Response, error) {
-	url := e.server.URL + r.URL.Path
-	fmt.Println(url)
-	req, err := http.NewRequest(r.Method, url, r.Body)
+	req, err := http.NewRequest(r.Method, e.server.URL+r.URL.Path, r.Body)
 	if err != nil {
 		return nil, err
 	}
 	return c.Do(req)
 }
 
-func NewEndServer(flows []Flow) EndServer {
+func NewEndServer(flows []FlowTest) EndServer {
 	mux := http.NewServeMux()
 	for _, flow := range flows {
+		flow := flow
 		mux.HandleFunc(flow.Request.URL.Path, func(rw http.ResponseWriter, r *http.Request) {
 			for k, val := range flow.Response.Header {
 				for _, v := range val {
@@ -50,6 +49,7 @@ func NewEndServer(flows []Flow) EndServer {
 				}
 			}
 			rw.WriteHeader(flow.Response.StatusCode)
+			duplicateReadCloser(flow.Response.Body)
 			response, _ := stringify(flow.Response.Body)
 			fmt.Fprint(rw, response)
 		})
@@ -59,37 +59,13 @@ func NewEndServer(flows []Flow) EndServer {
 	}
 }
 
-func TestProxy(t *testing.T) {
-	flows := []Flow{
-		{
-			Request: http.Request{
-				Method: "GET",
-				URL:    &url.URL{Path: "/"},
-			},
-			Response: http.Response{
-				StatusCode: 200,
-				Header: http.Header{
-					"Content-Type": []string{"application/json"},
-				},
-				Body: io.NopCloser(bytes.NewReader([]byte(`{"foo": "bar"}`))),
-			},
-		},
-		{
-			Request: http.Request{
-				Method: "POST",
-				URL:    &url.URL{Path: "/hoge"},
-			},
-			Response: http.Response{
-				StatusCode: 200,
-				Header: http.Header{
-					"Content-Type": []string{"application/json"},
-					"X-Foo":        []string{"foo"},
-				},
-				Body: io.NopCloser(bytes.NewReader([]byte(`{"foo": "bar"}`))),
-			},
-		},
-	}
+type FlowTest struct {
+	Flow
+	RespBody io.ReadCloser
+}
 
+func TestProxy(t *testing.T) {
+	flows := createFlows()
 	es := NewEndServer(flows)
 	pserver := httptest.NewServer(NewProxy())
 	url, _ := url.Parse(pserver.URL)
@@ -101,8 +77,52 @@ func TestProxy(t *testing.T) {
 	for _, flow := range flows {
 		resp, err := es.request(&c, &flow.Request)
 		assert.NoError(t, err)
-		r, err := io.ReadAll(resp.Body)
+		actual, err := io.ReadAll(resp.Body)
 		assert.NoError(t, err)
-		assert.Equal(t, "hello", string(r))
+		expected, err := io.ReadAll(flow.RespBody)
+		assert.NoError(t, err)
+		fmt.Println()
+		assert.Equal(t, string(expected), string(actual))
 	}
+}
+
+func createFlows() []FlowTest {
+	original, dup := duplicateReadCloser(io.NopCloser(bytes.NewReader([]byte(`{"foo":"bar"}`))))
+	original2, dup2 := duplicateReadCloser(io.NopCloser(bytes.NewReader([]byte(`{"a":"b","hoge":"foo"}`))))
+	flows := []FlowTest{
+		{
+			Flow: Flow{
+				Request: http.Request{
+					Method: "GET",
+					URL:    &url.URL{Path: "/"},
+				},
+				Response: http.Response{
+					StatusCode: 200,
+					Header: http.Header{
+						"Content-Type": []string{"application/json"},
+					},
+					Body: original,
+				},
+			},
+			RespBody: dup,
+		},
+		{
+			Flow: Flow{
+				Request: http.Request{
+					Method: "POST",
+					URL:    &url.URL{Path: "/hoge"},
+				},
+				Response: http.Response{
+					StatusCode: 200,
+					Header: http.Header{
+						"Content-Type": []string{"application/json"},
+						"X-Foo":        []string{"foo"},
+					},
+					Body: original2,
+				},
+			},
+			RespBody: dup2,
+		},
+	}
+	return flows
 }
