@@ -125,7 +125,8 @@ func TestStringify(t *testing.T) {
 	} else {
 		return string(j), nil
 	}
-}`, fmt.Sprintf("%#v", &generated))
+} 
+`, fmt.Sprintf("%#v", &generated))
 }
 
 func TestGenerateStringifyUrlValues(t *testing.T) {
@@ -137,5 +138,6 @@ func TestGenerateStringifyUrlValues(t *testing.T) {
 		return "", err
 	}
 	return string(query), nil
-}`, fmt.Sprintf("%#v", &generated))
+} 
+`, fmt.Sprintf("%#v", &generated))
 }

@@ -72,49 +72,10 @@ func main() {
 func start(c *cli.Context) error {
 	initLog(c)
 	mockServerPort = c.Int("mockBeginPort")
-
-	proxy := goproxy.NewProxyHttpServer()
+	proxy := NewProxy()
 	if c.String("cert") != "" && c.String("key") != "" {
 		enableHttpsProxy(c, proxy)
 	}
-
-	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		flowID := uuid.New().String()
-		var reqBody io.ReadCloser
-		r.Body, reqBody = duplicateReadCloser(r.Body)
-		request := http.Request{
-			URL:    r.URL,
-			Host:   r.Host,
-			Method: r.Method,
-			Body:   reqBody,
-		}
-		ctx.UserData = Flow{
-			ID:      flowID,
-			Request: request,
-		}
-		return r, nil
-	})
-
-	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		flow := ctx.UserData.(Flow)
-		var respBody io.ReadCloser
-		if r == nil {
-			log.Warn().Msgf("%s %s", ctx.Req.Method, ctx.Req.URL.String())
-			return r
-		} else {
-			r.Body, respBody = duplicateReadCloser(r.Body)
-		}
-		response := http.Response{
-			StatusCode: r.StatusCode,
-			Header:     r.Header,
-			Body:       respBody,
-		}
-		flow.Response = response
-		flows.add(flow)
-		log.Info().Msgf("%s %s", r.Request.Method, r.Request.URL.String())
-		return r
-	})
-
 	svc := http.Server{
 		Addr:    c.String("host") + ":" + c.String("port"),
 		Handler: proxy,
@@ -159,4 +120,46 @@ func initLog(c *cli.Context) {
 	if c != nil && c.Bool("debug") {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
+}
+
+func NewProxy() *goproxy.ProxyHttpServer {
+	proxy := goproxy.NewProxyHttpServer()
+
+	proxy.OnRequest().DoFunc(func(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		flowID := uuid.New().String()
+		var reqBody io.ReadCloser
+		r.Body, reqBody = duplicateReadCloser(r.Body)
+		request := http.Request{
+			URL:    r.URL,
+			Host:   r.Host,
+			Method: r.Method,
+			Body:   reqBody,
+		}
+		ctx.UserData = Flow{
+			ID:      flowID,
+			Request: request,
+		}
+		return r, nil
+	})
+
+	proxy.OnResponse().DoFunc(func(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		flow := ctx.UserData.(Flow)
+		var respBody io.ReadCloser
+		if r == nil {
+			log.Warn().Msgf("%s %s", ctx.Req.Method, ctx.Req.URL.String())
+			return r
+		} else {
+			r.Body, respBody = duplicateReadCloser(r.Body)
+		}
+		response := http.Response{
+			StatusCode: r.StatusCode,
+			Header:     r.Header,
+			Body:       respBody,
+		}
+		flow.Response = response
+		flows.add(flow)
+		log.Info().Msgf("%s %s", r.Request.Method, r.Request.URL.String())
+		return r
+	})
+	return proxy
 }

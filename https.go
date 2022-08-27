@@ -32,6 +32,8 @@ func enableHttpsProxy(c *cli.Context, proxy *goproxy.ProxyHttpServer) error {
 	if err != nil {
 		return fmt.Errorf("failed to open key file: %w", err)
 	}
+	defer keyFile.Close()
+	defer certFile.Close()
 	certificate, err := createCertificate(certFile, keyFile)
 	if err != nil {
 		return fmt.Errorf("failed to create certificate: %w", err)
