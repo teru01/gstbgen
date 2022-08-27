@@ -149,11 +149,7 @@ func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []
 				var codes []jen.Code
 				if isFirst {
 					codes = append(codes,
-						jen.List(jen.Id("body"), jen.Err()).Op(":=").Id("stringify").Call(jen.Id("r").Dot("Body")),
-						jen.If(jen.Err().Op("!=").Nil()).Block(
-							jen.Id("rw").Dot("WriteHeader").Call(jen.Qual("net/http", "StatusBadRequest")),
-							jen.Return(),
-						),
+						jen.List(jen.Id("body"), jen.Id("_")).Op(":=").Id("stringify").Call(jen.Id("r").Dot("Body")),
 					)
 				}
 				codes = append(codes, *childCodes...)

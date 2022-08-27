@@ -20,6 +20,7 @@ func TestGenerateMain(t *testing.T) {
 			Method: "GET",
 			Host:   "localhost:8080",
 			URL:    &url.URL{Path: "/"},
+			Body:   io.NopCloser(bytes.NewReader([]byte(`{"token": "abc"}`))),
 		},
 		Response: http.Response{
 			StatusCode: 200,
@@ -54,12 +55,8 @@ func TestGenerateMain(t *testing.T) {
 		mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
 			if r.Method == "GET" {
 				if q, _ := stringifyUrlValues(r.URL.Query()); q == "{}" {
-					body, err := stringify(r.Body)
-					if err != nil {
-						rw.WriteHeader(http.StatusBadRequest)
-						return
-					}
-					if body == "" {
+					body, _ := stringify(r.Body)
+					if body == "{\"token\":\"abc\"}" {
 						rw.WriteHeader(200)
 						fmt.Fprint(rw, "{\"foo\":\"bar\"}")
 						return
@@ -78,11 +75,7 @@ func TestGenerateMain(t *testing.T) {
 		mux.HandleFunc("/hoge", func(rw http.ResponseWriter, r *http.Request) {
 			if r.Method == "GET" {
 				if q, _ := stringifyUrlValues(r.URL.Query()); q == "{}" {
-					body, err := stringify(r.Body)
-					if err != nil {
-						rw.WriteHeader(http.StatusBadRequest)
-						return
-					}
+					body, _ := stringify(r.Body)
 					if body == "" {
 						rw.Header().Set("X-Foo", "foo")
 						rw.WriteHeader(200)
