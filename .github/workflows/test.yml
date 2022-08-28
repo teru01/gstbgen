@@ -1,0 +1,14 @@
+name: test
+on: 
+  push:
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    container: golang:1.19.0-bullseye
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: vet
+        run: go vet
+      - name: test
+        run: go test -v
