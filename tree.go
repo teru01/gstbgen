@@ -67,13 +67,13 @@ func (h *Root) value() string {
 
 func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	var codes []jen.Code
-	listenAddr := fmt.Sprintf("0.0.0.0:%d", mockServerPort)
 	codes = append(codes, jen.Id("mux").Op(":=").Qual("net/http", "NewServeMux").Call())
 	codes = append(codes, *childCodes...)
 	codes = append(codes,
+		jen.Id("port").Op(":=").Lit(mockServerPort),
 		jen.Id("server").Op(":=").Qual("net/http", "Server").Values(jen.Dict{
-			jen.Id("Addr"):    jen.Lit(listenAddr),
-			jen.Id("Handler"): jen.Id("mux"),
+			jen.Id("Addr"):    jen.Lit("0.0.0.0:").Op("+").Qual("fmt", "Sprint").Call(jen.Id("port")),
+			jen.Id("Handler"): jen.Id("enableLogRequest").Call(jen.Id("mux"), jen.Id("port")),
 		}),
 		jen.Qual("fmt", "Printf").Call(jen.Lit("Listening on %v\n"), jen.Id("server").Dot("Addr")),
 		jen.Go().Id("server").Dot("ListenAndServe").Call(),

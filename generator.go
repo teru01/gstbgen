@@ -149,6 +149,8 @@ func generate(root SyntaxNode) *jen.Statement {
 	codes = append(codes, jen.Line())
 	codes = append(codes, generateStringifyUrlValues()...)
 	codes = append(codes, jen.Line())
+	codes = append(codes, generateEnableLogRequest()...)
+	codes = append(codes, jen.Line())
 	codes = append(codes, generateServerFuncs(root, true, true)...)
 	codes = append(codes, jen.Line())
 	codes = append(codes, generateMapComment(externalAPIToMockServerMap)...)
@@ -224,6 +226,20 @@ func generateStringifyUrlValues() []jen.Code {
 				jen.Return(jen.Lit(""), jen.Err()),
 			),
 			jen.Return(jen.Id("string").Call(jen.Id("query")), jen.Nil()),
+		),
+		jen.Line(),
+	}
+}
+
+func generateEnableLogRequest() []jen.Code {
+	return []jen.Code{
+		jen.Func().Id("enableLogRequest").Params(jen.Id("handler").Qual("net/http", "Handler"), jen.Id("port").Int()).Qual("net/http", "Handler").Block(
+			jen.Return(
+				jen.Qual("net/http", "HandlerFunc").Call(jen.Func().Params(jen.Id("w").Qual("net/http", "ResponseWriter"), jen.Id("r").Op("*").Qual("net/http", "Request")).Block(
+					jen.Id("handler").Dot("ServeHTTP").Call(jen.Id("w"), jen.Id("r")),
+					jen.Qual("log", "Printf").Call(jen.Lit("%s %s %v %s \n"), jen.Id("r").Dot("RemoteAddr"), jen.Id("r").Dot("Method"), jen.Id("port"), jen.Id("r").Dot("URL")),
+				)),
+			),
 		),
 		jen.Line(),
 	}

@@ -64,9 +64,10 @@ func TestGenerateMain(t *testing.T) {
 				}
 			}
 		})
+		port := 8080
 		server := http.Server{
-			Addr:    "0.0.0.0:8080",
-			Handler: mux,
+			Addr:    "0.0.0.0:" + fmt.Sprint(port),
+			Handler: enableLogRequest(mux, port),
 		}
 		fmt.Printf("Listening on %v\n", server.Addr)
 		go server.ListenAndServe()
@@ -86,9 +87,10 @@ func TestGenerateMain(t *testing.T) {
 				}
 			}
 		})
+		port := 8081
 		server := http.Server{
-			Addr:    "0.0.0.0:8081",
-			Handler: mux,
+			Addr:    "0.0.0.0:" + fmt.Sprint(port),
+			Handler: enableLogRequest(mux, port),
 		}
 		fmt.Printf("Listening on %v\n", server.Addr)
 		go server.ListenAndServe()
@@ -135,4 +137,15 @@ func TestGenerateStringifyUrlValues(t *testing.T) {
 	return string(query), nil
 } 
 `, fmt.Sprintf("%#v", &generated))
+}
+
+func TestGenerateEnableLogRequest(t *testing.T) {
+	generated := jen.Statement(generateEnableLogRequest())
+	assert.Equal(t,
+		`func enableLogRequest(handler http.Handler, port int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler.ServeHTTP(w, r)
+		log.Printf("%s %s %v %s \n", r.RemoteAddr, r.Method, port, r.URL)
+	})
+}`, fmt.Sprintf("%#v", &generated))
 }
