@@ -147,5 +147,6 @@ func TestGenerateEnableLogRequest(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		log.Printf("%s %s %v %s \n", r.RemoteAddr, r.Method, port, r.URL)
 	})
-}`, fmt.Sprintf("%#v", &generated))
+} 
+`, fmt.Sprintf("%#v", &generated))
 }

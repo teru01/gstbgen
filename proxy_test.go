@@ -82,9 +82,10 @@ func TestProxy(t *testing.T) {
 		assert.NoError(t, err)
 		expected, err := io.ReadAll(flow.RespBody)
 		assert.NoError(t, err)
-		fmt.Println()
 		assert.Equal(t, string(expected), string(actual))
 	}
+	capturedFlows := p.Flows()
+	assert.Equal(t, len(testFlows), len(capturedFlows))
 }
 
 func createFlows() []FlowTest {
