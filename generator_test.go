@@ -95,7 +95,7 @@ func TestGenerateMain(t *testing.T) {
 		fmt.Printf("Listening on %v\n", server.Addr)
 		go server.ListenAndServe()
 	}()
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-sig
 }`, fmt.Sprintf("%#v", &stmt))

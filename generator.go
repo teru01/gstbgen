@@ -187,7 +187,7 @@ func generateServerFuncs(node SyntaxNode, isFirst, isLast bool) []jen.Code {
 
 func generateSignalHandler() []jen.Code {
 	return []jen.Code{
-		jen.Id("sig").Op(":=").Make(jen.Chan().Qual("os", "Signal")),
+		jen.Id("sig").Op(":=").Make(jen.Chan().Qual("os", "Signal"), jen.Lit(1)),
 		jen.Qual("os/signal", "Notify").Call(jen.Id("sig"), jen.Qual("syscall", "SIGINT"), jen.Qual("syscall", "SIGTERM"), jen.Qual("syscall", "SIGQUIT")),
 		jen.Id("<-sig"),
 	}
