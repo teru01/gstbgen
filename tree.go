@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/dave/jennifer/jen"
 	"github.com/rs/zerolog/log"
@@ -76,8 +77,12 @@ func (h *Host) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 			jen.Id("Handler"): jen.Id("enableLogRequest").Call(jen.Id("mux"), jen.Id("port")),
 		}),
 		jen.Qual("fmt", "Printf").Call(jen.Lit("Listening on %v\n"), jen.Id("server").Dot("Addr")),
-		jen.Go().Id("server").Dot("ListenAndServe").Call(),
 	)
+	if strings.HasPrefix(h.value(), "https") {
+		codes = append(codes, jen.Go().Id("server").Dot("ListenAndServeTLS").Call(jen.Lit("cert.pem"), jen.Lit("key.pem")))
+	} else {
+		codes = append(codes, jen.Go().Id("server").Dot("ListenAndServe").Call())
+	}
 	externalAPIToMockServerMap[h.value()] = mockServerPort
 	mockServerPort++
 	return []jen.Code{

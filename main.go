@@ -37,7 +37,7 @@ func main() {
 			&cli.IntFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
-				Value:   8080,
+				Value:   8888,
 				Usage:   "listening port",
 			},
 			&cli.BoolFlag{

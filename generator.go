@@ -18,13 +18,15 @@ func createExternalAPITree(flows map[string]Flow) (SyntaxNode, error) {
 		var hostString string
 		hostport := strings.Split(flow.Request.Host, ":")
 		if len(hostport) == 1 {
+			var port int
 			if flow.Request.URL.Scheme == "https" {
-				hostString = fmt.Sprintf("%s:%d", flow.Request.Host, 443)
+				port = 443
 			} else {
-				hostString = fmt.Sprintf("%s:%d", flow.Request.Host, 80)
+				port = 80
 			}
+			hostString = fmt.Sprintf("%s://%s:%d", flow.Request.URL.Scheme, flow.Request.Host, port)
 		} else {
-			hostString = flow.Request.Host
+			hostString = fmt.Sprintf("%s://%s", flow.Request.URL.Scheme, flow.Request.Host)
 		}
 
 		queryString, err := stringifyUrlValues(flow.Request.URL.Query())
