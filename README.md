@@ -1,12 +1,12 @@
 # gstbgen
 
-gstbgen generates stub server code for external APIs and is primarily used for system analysis, load testing, and debugging.
+gstbgen generates stub server code of external APIs and is primarily used for system analysis, load testing, and debugging.
 
 # Why gstbgen?
 
 Stub servers are often created to avoid overloading external APIs in load tests or for analysis and debugging and so on.
 
-If the system under test(SUT) is complex and depends on many external APIs, or if it is legacy and not well documented, creating stubs to mimic requests and responses can be a daunting task.
+If the system under test(SUT) is complex and depends on many external APIs, or if it is legacy and not well documented, creating stubs to mimic the external APIs can be a daunting task.
 
 gstbgen semi-automates such tasks and helps create stub servers from collected requests and responses.
 
@@ -23,6 +23,16 @@ By rewriting the hostname information of the external API used by the SUT to the
 This would be useful for load testing and debugging.
 
 # Installation
+
+Use prebuild releases.
+
+```
+$ curl -LO https://github.com/teru01/gstbgen/releases/download/v0.1.0/gstbgen_0.1.0_[OS]_[ARCH].tar.gz
+$ tar -xvf gstbgen_0.1.0_[OS]_[ARCH].tar.gz
+$ mv gstbgen /usr/local/bin
+```
+
+or you can build on your own.
 
 ```
 $ go install github.com/teru01/gstbgen@latest

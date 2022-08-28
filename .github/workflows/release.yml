@@ -16,13 +16,15 @@ jobs:
       - name: test
         run: go test -v
 
-  build:
+  release:
     needs: test
     runs-on: ubuntu-22.04
     container: golang:1.19.0-bullseye
     steps:
       - name: checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
         with:
