@@ -66,8 +66,8 @@ func main() {
 				Usage:   "generated stub server code path(default: stdout)",
 			},
 		},
-		Name:   "gprogen",
-		Usage:  "Go proxy and stub generator for load test",
+		Name:   "gstbgen",
+		Usage:  "Stub generator for system analysis written in Go.",
 		Action: start,
 	}
 	err := app.Run(os.Args)
