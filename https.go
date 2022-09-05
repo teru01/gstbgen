@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -12,41 +12,52 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/elazarl/goproxy"
 	"github.com/urfave/cli/v2"
 )
 
-func createCertificate(rootCertificateReader, rootKeyReader io.Reader) (tls.Certificate, error) {
-	var c tls.Certificate
+func createRootCAInfo(rootCertificateReader, rootKeyReader io.Reader) (*x509.Certificate, *rsa.PrivateKey, error) {
 	rootCertB, err := io.ReadAll(rootCertificateReader)
 	if err != nil {
-		return c, fmt.Errorf(": %w", err)
+		return nil, nil, fmt.Errorf(": %w", err)
 	}
 	rootCertBlock, _ := pem.Decode(rootCertB)
 	if err != nil {
-		return c, fmt.Errorf(": %w", err)
+		return nil, nil, fmt.Errorf(": %w", err)
 	}
 	rootCertificate, err := x509.ParseCertificate(rootCertBlock.Bytes)
 	if err != nil {
-		return c, fmt.Errorf(": %w", err)
+		return nil, nil, fmt.Errorf(": %w", err)
 	}
 	k, err := io.ReadAll(rootKeyReader)
 	if err != nil {
-		return c, fmt.Errorf("failed to read key: %w", err)
+		return nil, nil, fmt.Errorf(": %w", err)
 	}
 	rootKBlock, _ := pem.Decode(k)
 	rootKey, err := x509.ParsePKCS1PrivateKey(rootKBlock.Bytes)
 	if err != nil {
-		return c, fmt.Errorf("failed to read key: %w", err)
+		return nil, nil, fmt.Errorf(": %w", err)
 	}
+	return rootCertificate, rootKey, nil
+}
 
+func createCertificate(host string, rootCertificate *x509.Certificate, rootKey *rsa.PrivateKey) (tls.Certificate, error) {
+	var c tls.Certificate
 	serial, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	if err != nil {
 		return c, fmt.Errorf(": %w", err)
 	}
+
+	notBefore := time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)
+	notAfter := time.Now().AddDate(2, 0, 0)
+	cnHosts := strings.Split(host, ":")
 	template := x509.Certificate{
 		SerialNumber: serial,
+		NotBefore:    notBefore,
+		NotAfter:     notAfter,
 		Issuer: pkix.Name{
 			Country:      []string{"JP", "US"},
 			Organization: []string{"gstbgenCA"},
@@ -55,16 +66,20 @@ func createCertificate(rootCertificateReader, rootKeyReader io.Reader) (tls.Cert
 		Subject: pkix.Name{
 			Country:      []string{"JP", "US"},
 			Organization: []string{"gstbgen"},
-			CommonName:   "gstbgen",
+			CommonName:   cnHosts[0],
 		},
-		AuthorityKeyId: rootCertificate.SubjectKeyId,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+		AuthorityKeyId:        rootCertificate.SubjectKeyId,
 	}
 
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return c, fmt.Errorf(": %w", err)
 	}
-	certB, err := x509.CreateCertificate(rand.Reader, &template, rootCertificate, pub, rootKey)
+	certB, err := x509.CreateCertificate(rand.Reader, &template, rootCertificate, &priv.PublicKey, rootKey)
 	if err != nil {
 		return c, fmt.Errorf(": %w", err)
 	}
@@ -89,6 +104,7 @@ func createCertificate(rootCertificateReader, rootKeyReader io.Reader) (tls.Cert
 	if err != nil {
 		return c, fmt.Errorf(": %w", err)
 	}
+	fmt.Println(string(certPemB))
 	return tls.X509KeyPair(certPemB, keyPemB)
 }
 
@@ -103,15 +119,20 @@ func enableHttpsProxy(c *cli.Context, proxy *goproxy.ProxyHttpServer) error {
 	}
 	defer keyFile.Close()
 	defer certFile.Close()
-	certificate, err := createCertificate(certFile, keyFile)
+	rootCert, rootKey, err := createRootCAInfo(certFile, keyFile)
 	if err != nil {
-		return fmt.Errorf("failed to create certificate: %w", err)
-	}
-	customConnectAction := &goproxy.ConnectAction{
-		Action:    goproxy.ConnectMitm,
-		TLSConfig: goproxy.TLSConfigFromCA(&certificate),
+		return fmt.Errorf("failed to create rootca info: %w", err)
 	}
 	httpsHandler := func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+		certificate, err := createCertificate(host, rootCert, rootKey)
+		if err != nil {
+			fmt.Println(err)
+			// return fmt.Errorf("failed to create certificate: %w", err)
+		}
+		customConnectAction := &goproxy.ConnectAction{
+			Action:    goproxy.ConnectMitm,
+			TLSConfig: goproxy.TLSConfigFromCA(&certificate),
+		}
 		return customConnectAction, host
 	}
 	proxy.OnRequest().HandleConnect(goproxy.FuncHttpsHandler(httpsHandler))
