@@ -117,7 +117,7 @@ func start(c *cli.Context) error {
 		if c.String("out") == "" {
 			fmt.Println(buf.String())
 		} else {
-			out, err := os.OpenFile(c.String("out"), os.O_CREATE|os.O_WRONLY, 0644)
+			out, err := os.OpenFile(c.String("out"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
 				return fmt.Errorf("failed to open file: %w", err)
 			}
