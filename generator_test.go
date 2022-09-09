@@ -53,9 +53,9 @@ func TestGenerateMain(t *testing.T) {
 	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+			body, _ := stringify(r.Body)
 			if r.Method == "GET" {
 				if q, _ := stringifyUrlValues(r.URL.Query()); q == "{}" {
-					body, _ := stringify(r.Body)
 					if body == "{\"token\":\"abc\"}" {
 						rw.WriteHeader(200)
 						fmt.Fprint(rw, "{\"foo\":\"bar\"}")
@@ -75,9 +75,9 @@ func TestGenerateMain(t *testing.T) {
 	func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/hoge", func(rw http.ResponseWriter, r *http.Request) {
+			body, _ := stringify(r.Body)
 			if r.Method == "GET" {
 				if q, _ := stringifyUrlValues(r.URL.Query()); q == "{}" {
-					body, _ := stringify(r.Body)
 					if body == "" {
 						rw.Header().Set("X-Foo", "foo")
 						rw.WriteHeader(200)

@@ -151,16 +151,7 @@ func (h *RespBody) value() string {
 func (h *QueryParameter) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
 	return []jen.Code{
 		jen.If(jen.List(jen.Id("q"), jen.Id("_")).Op(":=").Id("stringifyUrlValues").Call(jen.Id("r").Dot("URL").Dot("Query").Call()), jen.Id("q").Op("==").Lit(h.value())).Block(
-			func() []jen.Code {
-				var codes []jen.Code
-				if isFirst {
-					codes = append(codes,
-						jen.List(jen.Id("body"), jen.Id("_")).Op(":=").Id("stringify").Call(jen.Id("r").Dot("Body")),
-					)
-				}
-				codes = append(codes, *childCodes...)
-				return codes
-			}()...,
+			*childCodes...,
 		),
 	}
 }
@@ -178,9 +169,13 @@ func (h *QueryParameter) value() string {
 }
 
 func (h *Method) render(childCodes *[]jen.Code, isFirst, isLast bool) []jen.Code {
-	return []jen.Code{
-		jen.If(jen.Id("r").Dot("Method").Op("==").Lit(h.value())).Block(*childCodes...),
+	var codes []jen.Code
+	if isFirst {
+		codes = append(codes,
+			jen.List(jen.Id("body"), jen.Id("_")).Op(":=").Id("stringify").Call(jen.Id("r").Dot("Body")),
+		)
 	}
+	return append(codes, jen.If(jen.Id("r").Dot("Method").Op("==").Lit(h.value())).Block(*childCodes...))
 }
 
 func (h *Method) children() map[string]SyntaxNode {
