@@ -13,7 +13,6 @@ import (
 )
 
 type EndServer struct {
-	m      map[RequestContent]ResponseContent
 	server *httptest.Server
 }
 
@@ -127,12 +126,4 @@ func createFlows() []FlowTest {
 		},
 	}
 	return flows
-}
-
-func createFlowsFromFlowTests(tfs []FlowTest) []Flow {
-	var fs []Flow
-	for _, tf := range tfs {
-		fs = append(fs, tf.Flow)
-	}
-	return fs
 }
