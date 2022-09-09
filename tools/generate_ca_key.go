@@ -30,16 +30,20 @@ func main() {
 		SerialNumber: serial,
 		NotBefore:    notBefore,
 		NotAfter:     notAfter,
+		Subject: pkix.Name{
+			CommonName: "gstbgen",
+		},
 		Issuer: pkix.Name{
 			Organization: []string{"gstbgen"},
 			CommonName:   "gstbgen",
 		},
-		IsCA:        true,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
 	}
 
-	certB, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, &priv)
+	certB, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -52,10 +56,10 @@ func main() {
 	if err := pem.Encode(&keyPem, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: marshaledKey}); err != nil {
 		log.Fatalln(err)
 	}
-	if err := os.WriteFile("gstbgen.crt", certPem.Bytes(), 0400); err != nil {
+	if err := os.WriteFile("gstbgen.crt", certPem.Bytes(), 0600); err != nil {
 		log.Fatalln(err)
 	}
-	if err := os.WriteFile("gstbgen.key", keyPem.Bytes(), 0400); err != nil {
+	if err := os.WriteFile("gstbgen.key", keyPem.Bytes(), 0600); err != nil {
 		log.Fatalln(err)
 	}
 }
