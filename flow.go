@@ -24,16 +24,6 @@ func (f *Flowsx) add(flow Flow) {
 	f.Flows[flow.ID] = flow
 }
 
-func (f *Flowsx) addResponse(flowID string, response http.Response) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-	f.Flows[flowID] = Flow{
-		ID:       flowID,
-		Request:  f.Flows[flowID].Request,
-		Response: response,
-	}
-}
-
 func duplicateReadCloser(rc io.ReadCloser) (original io.ReadCloser, duplicated io.ReadCloser) {
 	var b bytes.Buffer
 	original = teeReadCloser(rc, &b)

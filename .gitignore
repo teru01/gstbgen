@@ -65,6 +65,12 @@ Temporary Items
 n
 
 gstbgen
+gstbgen.key
+gstbgen.crt
+
+cert.pem
+key.pem
+
 __debug_bin
 
 generated/main.go

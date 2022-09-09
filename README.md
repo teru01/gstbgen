@@ -186,10 +186,21 @@ That's it! You can use the stub server instead of the external APIs.
 
 ## HTTPS
 
-If the SUT uses HTTPS, the certificate and key path must be passed when to start gstbgen.
+If the SUT uses HTTPS for external requests, the rootCA's certificate and key path must be passed when to start gstbgen.
+
+To see the contents of captured HTTPS requests and responses, gstbgen dynamically creates TLS certificates from captured requests, and signs them using this key.
+
+You can use `tools/generate_ca_key.go` to generate them.
 
 ```
-$ ./gstbgen --cert ./cert.crt --key ./cert.key
+$ go run tools/generate_ca_key.go
+./gstbgen.crt and ./gstbgen.key was generated.
+```
+
+
+
+```
+$ ./gstbgen --cert ./gstbgen.crt --key ./gstbgen.key
 ```
 
 On the SUT, you need to set the `https_proxy` environment variable and trust the `cert.crt` that you used when started gstbgen.
@@ -204,7 +215,7 @@ On Linux, the certificate trust settings should be different for each distributi
 cat cert.crt >> /etc/ssl/certs/ca-certificates.crt
 ```
 
-The generated stub server then uses `server.ListenAndServeTLS`. Prepare appropriate certificates and keys in `cert.pem` and `key.pem` (you can use the ones from earlier)
+The generated stub server then uses `server.ListenAndServeTLS`. Prepare appropriate certificates and keys in `cert.pem` and `key.pem`.
 
 ```
 go server.ListenAndServeTLS("cert.pem", "key.pem")
