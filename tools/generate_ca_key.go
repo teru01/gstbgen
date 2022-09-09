@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -62,4 +63,5 @@ func main() {
 	if err := os.WriteFile("gstbgen.key", keyPem.Bytes(), 0600); err != nil {
 		log.Fatalln(err)
 	}
+	fmt.Println("./gstbgen.crt and ./gstbgen.key was generated.")
 }
