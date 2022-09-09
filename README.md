@@ -27,8 +27,8 @@ This would be useful for load testing and debugging.
 Use prebuild releases.
 
 ```
-$ curl -LO https://github.com/teru01/gstbgen/releases/download/v0.1.0/gstbgen_0.1.0_[OS]_[ARCH].tar.gz
-$ tar -xvf gstbgen_0.1.0_[OS]_[ARCH].tar.gz
+$ curl -LO https://github.com/teru01/gstbgen/releases/download/v0.2.1/gstbgen_0.2.1_[OS]_[ARCH].tar.gz
+$ tar -xvf gstbgen_0.2.1_[OS]_[ARCH].tar.gz
 $ mv gstbgen /usr/local/bin
 ```
 
